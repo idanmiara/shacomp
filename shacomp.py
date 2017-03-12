@@ -17,11 +17,16 @@ def plot(c):
     plt.xticks(indexes + width * 0.5, labels)
     plt.show()
 
+def isJunkFile(filename):
+    junk = ["thumbs.db","desktop.ini", "picasa.ini", ".picasa.ini", "picasa.ini1", ".picasa.ini1"]
+    return (os.path.basename(filename).lower() in junk)
+
 def readfile( d, filename, siglen=0):
     # with open(filename, encoding="utf-8-sig").read().decode("utf-8-sig") as f:
     with open(filename, mode='r', encoding="utf-8-sig") as f:
         valid_lines=0
         total_lines=0
+        junk_lines=0
         if siglen==0:
             siglen=128
         delim=' *'
@@ -36,19 +41,39 @@ def readfile( d, filename, siglen=0):
             if (len(kv)!=2) or (len(kv[0])!=siglen) or (len(kv[1])==0):
                 invalid.append(line)
             else:
-                # d.setdefault(key,[])
-                # d.append(val)
-                valid_lines+=1
-                d[kv[0]].append(kv[1])
-    print("{0}: valid: {1}/{2} unique entries:{3}".format(filename,valid_lines,total_lines,len(d)))
+                if isJunkFile(kv[1]):
+                    junk_lines+=1
+                else:
+                    # d.setdefault(key,[])
+                    # d.append(val)
+                    valid_lines+=1
+                    d[kv[0]].append(kv[1])
+    print("{}: valid: {}/{}, junk:{} unique entries:{}".format(filename,valid_lines,total_lines,junk_lines,len(d)))
     printstats(d)
 
 def printstats(d):
     c,hist = sumDefaultDict(d)
     total = sum(c.values())
     print("dict stats: unique entries:{}/{}".format(total,len(d)))
-    plot(hist)
+    # plot(hist)
     return c
+
+# returns a list of tuples [ (key val)...]
+def getUniqueTupListFromDict(d):
+    l = []
+    for key, value in d.items():
+        l.append((key,value[0])) #append only key and first val
+    l.sort(key=lambda tup: tup[1])  # sorts in place
+    return l
+
+def saveTupList(l, filename):
+    text_file = open(filename, "w", -1, "utf-8-sig")
+    count=len(l)
+    for k, v in l:
+        s='{0} *{1}\n'.format(k,v)
+        text_file.write(s)
+    print("Writing: {0}: {1} lines".format(filename,count))
+    text_file.close()
 
 # def readoutfile( d, filename):
 #     with open(filename) as f:
@@ -93,13 +118,14 @@ def read_write(dir=r'd:\projects\shacomp', master=r'pictures',ext='sha512'):
     #dir=os.getcwd()
     if dir!='':
         os.chdir(dir)
+
     base_file=master+'.'+ext
-    in_pattern='*.'+ext
     if base_file!='':
         s = os.path.join(dir,base_file)
         if os.path.isfile(s):
             readfile(d, s)
 
+    in_pattern='*.'+ext
     # for filename in re.compile(fnmatch.translate(in_pattern), re.IGNORECASE):
     for filename in sorted(glob.glob(in_pattern)):
         if filename==base_file:
@@ -107,6 +133,10 @@ def read_write(dir=r'd:\projects\shacomp', master=r'pictures',ext='sha512'):
         s=os.path.join(dir, filename)
         readfile(d, s)
     # writefile(d, os.path.join(dir, outfile))
+
+    l=getUniqueTupListFromDict(d)
+    s = os.path.join(dir,"uniques.sha512")
+    saveTupList(l, s)
 
 def deldups(basedir, d):
     deleted = 0
