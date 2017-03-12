@@ -1,9 +1,25 @@
 import sys
 import glob, re, fnmatch, os
 import collections
+import shutil
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def plot(c):
+    # labels, values = zip(*Counter(['A','B','A','C','A','A']).items())
+    labels, values = zip(*c.items())
+
+    indexes = np.arange(len(labels))
+    width = 1
+
+    plt.bar(indexes, values, width)
+    plt.xticks(indexes + width * 0.5, labels)
+    plt.show()
 
 def readfile( d, filename, siglen=0):
-    with open(filename) as f:
+    # with open(filename, encoding="utf-8-sig").read().decode("utf-8-sig") as f:
+    with open(filename, mode='r', encoding="utf-8-sig") as f:
         valid_lines=0
         total_lines=0
         if siglen==0:
@@ -16,15 +32,23 @@ def readfile( d, filename, siglen=0):
             if (line==''):
                 continue
             total_lines+=1
-            [key,val]=line.split(delim, 1)
-            if (len(key)!=siglen) or (len(val)==0):
+            kv=line.split(delim, 1)
+            if (len(kv)!=2) or (len(kv[0])!=siglen) or (len(kv[1])==0):
                 invalid.append(line)
             else:
                 # d.setdefault(key,[])
                 # d.append(val)
-                d[key]=val
                 valid_lines+=1
-    print("{0}: valid: {1}/{2} entries:{3}".format(filename,valid_lines,total_lines,len(d)))
+                d[kv[0]].append(kv[1])
+    print("{0}: valid: {1}/{2} unique entries:{3}".format(filename,valid_lines,total_lines,len(d)))
+    printstats(d)
+
+def printstats(d):
+    c,hist = sumDefaultDict(d)
+    total = sum(c.values())
+    print("dict stats: unique entries:{}/{}".format(total,len(d)))
+    plot(hist)
+    return c
 
 # def readoutfile( d, filename):
 #     with open(filename) as f:
@@ -53,23 +77,89 @@ def readfile( d, filename, siglen=0):
 #     else:
 #         print("No items found!")
 
-def read_write(dir=r'd:\shacomp', base_file=r'pictures.sha512'):
+def sumDefaultDict(d):
+    c = collections.Counter()
+    hist = collections.Counter()
+    for key, value in d.items():
+        l = len(value)
+        c[key]=l
+        hist[l]+=1
+    return c,hist
+
+def read_write(dir=r'd:\projects\shacomp', master=r'pictures',ext='sha512'):
     # d = {}
     d = collections.defaultdict(list)
+    # c = collections.Counter(value for values in d.itervalues() for value in values)
     #dir=os.getcwd()
     if dir!='':
         os.chdir(dir)
+    base_file=master+'.'+ext
+    in_pattern='*.'+ext
     if base_file!='':
         s = os.path.join(dir,base_file)
         if os.path.isfile(s):
             readfile(d, s)
-    # print("{}: ",base_file,)
-    #for filename in re.compile(fnmatch.translate(in_pattern), re.IGNORECASE):
-    # for filename in sorted(glob.glob(in_pattern)):
-    #     if filename==base_file:
-    #         continue
-    #     readfile(d, os.path.join(dir, filename))
+
+    # for filename in re.compile(fnmatch.translate(in_pattern), re.IGNORECASE):
+    for filename in sorted(glob.glob(in_pattern)):
+        if filename==base_file:
+            continue
+        s=os.path.join(dir, filename)
+        readfile(d, s)
     # writefile(d, os.path.join(dir, outfile))
+
+def deldups(basedir, d):
+    deleted = 0
+    total=0
+    totalfound=0
+    firstsFound=0
+    for key, value in d.items():
+        copyfound = False
+        isFirst = True
+        for f in value:
+            filename=os.path.join(basedir, f)
+            currfound=os.path.isfile(filename)
+            total+=1
+            if currfound:
+                totalfound+=1
+            if copyfound:
+                deleted+=1
+                if currfound:
+                    os.remove(filename)
+                if isFirst:
+                    firstsFound +=1
+            else:
+                copyfound=currfound
+            isFirst = False
+
+def undeldups(basedir, d):
+    undeleted = 0
+    undeletedFailed = []
+    total=0
+    totalfound=0
+    firstsFound=0
+    for key, value in d.items():
+        isFirst = True
+        thisSource = None
+        for f in value:
+            filename=os.path.join(basedir, f)
+            currfound=os.path.isfile(filename)
+            total+=1
+            if currfound:
+                if isFirst:
+                    firstsFound+=1
+                totalfound+=1
+                if thisSource==None:
+                    thisSource=filename
+            else:
+                if thisSource!=None:
+                    shutil.copyfile(thisSource, filename)
+                if os.path.isfile(filename):
+                    undeleted+=1
+                else:
+                    undeletedFailed+=1
+            isFirst = False
+
 #
 # if len(sys.argv) >= 2:
 #     dir = sys.argv[1]
