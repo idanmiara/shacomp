@@ -25,7 +25,7 @@ def isJunkFile(filename):
     junk = ["thumbs.db","desktop.ini", "picasa.ini", ".picasa.ini", "picasa.ini1", ".picasa.ini1"]
     return (os.path.basename(filename).lower() in junk)
 
-def readfile( d, filename, uniquelog = None, siglen=0):
+def readfile( filename, d, d_ext, uniquelog = None, siglen=0):
     # with open(filename, encoding="utf-8-sig").read().decode("utf-8-sig") as f:
     with open(filename, mode='r', encoding="utf-8-sig") as f:
         print ("{} ...".format(filename))
@@ -54,6 +54,8 @@ def readfile( d, filename, uniquelog = None, siglen=0):
                 else:
                     # d.setdefault(key,[])
                     # d.append(val)
+                    ext = os.path.splitext(val)[1]
+                    d_ext[ext]+=1
                     valid_count+=1
                     if not val in d[key]:
                         d[key].append(val)
@@ -66,6 +68,8 @@ def readfile( d, filename, uniquelog = None, siglen=0):
     verify_total = valid_count + invalid_count + junk_count
     print("{}: valid: {}(unique: {} + dups: {}) + invalid: {} + junk: {} = total: {} entries, ({})".format(filename,valid_count,new_unique_count,valid_count-new_unique_count,invalid_count,junk_count,total_lines,verify_total==verify_total))
     printstats(d)
+    print('ext list:')
+    print(d_ext)
 
 def printstats(d):
     c,hist = sumDefaultDict(d)
@@ -133,6 +137,7 @@ def read_write(dir, master, ext='sha512'):
     # key = hash
     # value = list of files
     d = collections.defaultdict(list)
+    d_ext = collections.Counter()
     # c = collections.Counter(value for values in d.itervalues() for value in values)
     #dir=os.getcwd()
     if dir!='':
@@ -144,7 +149,7 @@ def read_write(dir, master, ext='sha512'):
         s = os.path.join(dir,filename)
         if os.path.isfile(s):
             print("0:")
-            readfile(d, s)
+            readfile(s, d, d_ext)
             print()
             # s = os.path.join(dir,filename+"-uniques.sha512")
             # saveTupList(uniquelog, s)
@@ -160,7 +165,7 @@ def read_write(dir, master, ext='sha512'):
         print('{}:'.format(i))
         s=os.path.join(dir, filename)
         uniquelog = []
-        readfile(d, s, uniquelog)
+        readfile(s, d, d_ext, uniquelog)
         if len(uniquelog) > 0:
             s = os.path.join(dir,os.path.splitext(filename)[0]+"-uniques.sha512")
             saveTupList(uniquelog, s)
