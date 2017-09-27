@@ -25,12 +25,14 @@ def isJunkFile(filename):
     junk = ["thumbs.db","desktop.ini", "picasa.ini", ".picasa.ini", "picasa.ini1", ".picasa.ini1"]
     return (os.path.basename(filename).lower() in junk)
 
-def readfile( d, filename, siglen=0, uniquelog = None):
+def readfile( d, filename, uniquelog = None, siglen=0):
     # with open(filename, encoding="utf-8-sig").read().decode("utf-8-sig") as f:
     with open(filename, mode='r', encoding="utf-8-sig") as f:
-        valid_lines=0
+        print ("{} ...".format(filename))
+        valid_count=0
         total_lines=0
-        junk_lines=0
+        junk_count=0
+        new_unique_count=0
         if siglen==0:
             siglen=128
         delim=' *'
@@ -48,23 +50,28 @@ def readfile( d, filename, siglen=0, uniquelog = None):
                 key = kv[0]
                 val = kv[1]
                 if isJunkFile(val):
-                    junk_lines+=1
+                    junk_count+=1
                 else:
                     # d.setdefault(key,[])
                     # d.append(val)
-                    valid_lines+=1
+                    valid_count+=1
                     if not val in d[key]:
                         d[key].append(val)
-                        if uniquelog:
-                            uniquelog.append([key, val])
-    print("{}: valid: {}/{}, junk:{} unique entries:{}".format(filename,valid_lines,total_lines,junk_lines,len(d)))
+                        if len(d[key])==1:
+                            new_unique_count+=1
+                            if not (uniquelog is None):
+                                uniquelog.append([key, val])
+    # unique_count = len(d)
+    invalid_count = len(invalid)
+    verify_total = valid_count + invalid_count + junk_count
+    print("{}: valid: {}(unique: {} + dups: {}) + invalid: {} + junk: {} = total: {} entries, ({})".format(filename,valid_count,new_unique_count,valid_count-new_unique_count,invalid_count,junk_count,total_lines,verify_total==verify_total))
     printstats(d)
 
 def printstats(d):
     c,hist = sumDefaultDict(d)
     total = sum(c.values())
-    print("dict stats: unique entries:{}/{}".format(total,len(d)))
-    plot(hist)
+    print("dict stats: unique entries:{}/{}".format(len(d),total))
+    # plot(hist)
     return c
 
 # returns a list of tuples [ (key val)...]
@@ -132,27 +139,40 @@ def read_write(dir, master, ext='sha512'):
         os.chdir(dir)
 
     base_file=master+'.'+ext
-    if base_file!='':
-        s = os.path.join(dir,base_file)
+    filename=base_file
+    if filename!='':
+        s = os.path.join(dir,filename)
         if os.path.isfile(s):
+            print("0:")
             readfile(d, s)
+            print()
+            # s = os.path.join(dir,filename+"-uniques.sha512")
+            # saveTupList(uniquelog, s)
+
 
     in_pattern='*.'+ext
     # for filename in re.compile(fnmatch.translate(in_pattern), re.IGNORECASE):
 
+    i=1
     for filename in sorted(glob.glob(in_pattern)):
-        if filename==base_file:
+        if filename==base_file or ("unique" in filename):
             continue
+        print('{}:'.format(i))
         s=os.path.join(dir, filename)
         uniquelog = []
         readfile(d, s, uniquelog)
-        s = os.path.join(dir,filename+"-uniques.sha512")
-        saveTupList(uniquelog, s)
-    # writefile(d, os.path.join(dir, outfile))
+        if len(uniquelog) > 0:
+            s = os.path.join(dir,os.path.splitext(filename)[0]+"-uniques.sha512")
+            saveTupList(uniquelog, s)
+        # writefile(d, os.path.join(dir, outfile))
+        print("{} new unique files from file:{}, base file:{}".format(len(uniquelog), base_file, filename))
+        print()
+        i += 1
 
     l=getUniqueTupListFromDict(d)
     s = os.path.join(dir,"uniques.sha512")
     saveTupList(l, s)
+    print("finish!")
 
 def deldups(basedir, d):
     deleted = 0
@@ -228,6 +248,6 @@ def undeldups(basedir, d):
 #     outfile = 'NEW_PRICE_LIST.txt'
 
 # read_write(dir, base_file, in_pattern, outfile)
-read_write(dir=r"d:\git\shacomp\sha\1", master="Pictures-20170311");
+read_write(dir=r"d:\git\shacomp\sha2", master="Pictures-20170311");
 
 # os.system("pause")
