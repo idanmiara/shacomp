@@ -4,6 +4,10 @@ import collections
 import shutil
 
 import numpy as np
+# import matplotlib.pyplot as plt
+
+import matplotlib
+matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 
 def plot(c):
@@ -21,7 +25,7 @@ def isJunkFile(filename):
     junk = ["thumbs.db","desktop.ini", "picasa.ini", ".picasa.ini", "picasa.ini1", ".picasa.ini1"]
     return (os.path.basename(filename).lower() in junk)
 
-def readfile( d, filename, siglen=0):
+def readfile( d, filename, siglen=0, uniquelog = None):
     # with open(filename, encoding="utf-8-sig").read().decode("utf-8-sig") as f:
     with open(filename, mode='r', encoding="utf-8-sig") as f:
         valid_lines=0
@@ -41,13 +45,18 @@ def readfile( d, filename, siglen=0):
             if (len(kv)!=2) or (len(kv[0])!=siglen) or (len(kv[1])==0):
                 invalid.append(line)
             else:
-                if isJunkFile(kv[1]):
+                key = kv[0]
+                val = kv[1]
+                if isJunkFile(val):
                     junk_lines+=1
                 else:
                     # d.setdefault(key,[])
                     # d.append(val)
                     valid_lines+=1
-                    d[kv[0]].append(kv[1])
+                    if not val in d[key]:
+                        d[key].append(val)
+                        if uniquelog:
+                            uniquelog.append([key, val])
     print("{}: valid: {}/{}, junk:{} unique entries:{}".format(filename,valid_lines,total_lines,junk_lines,len(d)))
     printstats(d)
 
@@ -55,7 +64,7 @@ def printstats(d):
     c,hist = sumDefaultDict(d)
     total = sum(c.values())
     print("dict stats: unique entries:{}/{}".format(total,len(d)))
-    # plot(hist)
+    plot(hist)
     return c
 
 # returns a list of tuples [ (key val)...]
@@ -102,17 +111,20 @@ def saveTupList(l, filename):
 #     else:
 #         print("No items found!")
 
+
 def sumDefaultDict(d):
-    c = collections.Counter()
-    hist = collections.Counter()
+    c = collections.Counter() # for each key the value length
+    hist = collections.Counter() # count the number of keys that have the same value length
     for key, value in d.items():
-        l = len(value)
+        l = len(value) #number of entries for this key
         c[key]=l
         hist[l]+=1
     return c,hist
 
-def read_write(dir=r'd:\projects\shacomp', master=r'pictures',ext='sha512'):
+def read_write(dir, master, ext='sha512'):
     # d = {}
+    # key = hash
+    # value = list of files
     d = collections.defaultdict(list)
     # c = collections.Counter(value for values in d.itervalues() for value in values)
     #dir=os.getcwd()
@@ -127,11 +139,15 @@ def read_write(dir=r'd:\projects\shacomp', master=r'pictures',ext='sha512'):
 
     in_pattern='*.'+ext
     # for filename in re.compile(fnmatch.translate(in_pattern), re.IGNORECASE):
+
     for filename in sorted(glob.glob(in_pattern)):
         if filename==base_file:
             continue
         s=os.path.join(dir, filename)
-        readfile(d, s)
+        uniquelog = []
+        readfile(d, s, uniquelog)
+        s = os.path.join(dir,filename+"-uniques.sha512")
+        saveTupList(uniquelog, s)
     # writefile(d, os.path.join(dir, outfile))
 
     l=getUniqueTupListFromDict(d)
@@ -212,6 +228,6 @@ def undeldups(basedir, d):
 #     outfile = 'NEW_PRICE_LIST.txt'
 
 # read_write(dir, base_file, in_pattern, outfile)
-read_write();
+read_write(dir=r"d:\git\shacomp\sha\1", master="Pictures-20170311");
 
 # os.system("pause")
