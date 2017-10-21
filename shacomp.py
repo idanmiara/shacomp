@@ -132,7 +132,7 @@ def sumDefaultDict(d):
         hist[l]+=1
     return c,hist
 
-def read_write(dir, master, ext='sha512'):
+def read_write(dir, master, ext='.sha512'):
     # d = {}
     # key = hash
     # value = list of files
@@ -143,7 +143,7 @@ def read_write(dir, master, ext='sha512'):
     if dir!='':
         os.chdir(dir)
 
-    base_file=master+'.'+ext
+    base_file=master+ext
     filename=base_file
     if filename!='':
         s = os.path.join(dir,filename)
@@ -155,7 +155,7 @@ def read_write(dir, master, ext='sha512'):
             # saveTupList(uniquelog, s)
 
 
-    in_pattern='*.'+ext
+    in_pattern='*'+ext
     # for filename in re.compile(fnmatch.translate(in_pattern), re.IGNORECASE):
 
     i=1
@@ -167,15 +167,17 @@ def read_write(dir, master, ext='sha512'):
         uniquelog = []
         readfile(s, d, d_ext, uniquelog)
         if len(uniquelog) > 0:
-            s = os.path.join(dir,os.path.splitext(filename)[0]+"-uniques.sha512")
+            s = os.path.join(dir,os.path.splitext(filename)[0]+"-uniques"+ext)
             saveTupList(uniquelog, s)
         # writefile(d, os.path.join(dir, outfile))
-        print("{} new unique files from file:{}, base file:{}".format(len(uniquelog), base_file, filename))
+        print("{} new unique files from file:{}, base file:{}".format(len(uniquelog), filename, base_file))
         print()
         i += 1
 
+    print("\nfinished loading files\n")
+
     l=getUniqueTupListFromDict(d)
-    s = os.path.join(dir,"uniques.sha512")
+    s = os.path.join(dir,"uniques"+ext)
     saveTupList(l, s)
     print("finish!")
 
@@ -253,6 +255,7 @@ def undeldups(basedir, d):
 #     outfile = 'NEW_PRICE_LIST.txt'
 
 # read_write(dir, base_file, in_pattern, outfile)
-read_write(dir=r"d:\git\shacomp\sha2", master="Pictures-20170311");
+# read_write(dir=r"d:\git\shacomp\sha2", master="Pictures-20170311");
+read_write(dir=r"d:\git\shacomp\sample", master="0");
 
 # os.system("pause")
