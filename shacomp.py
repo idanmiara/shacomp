@@ -73,14 +73,9 @@ def readfile(filename, d, d_ext, uniquelog=None, siglen=0):
     # unique_count = len(d)
     invalid_count = len(invalid)
     verify_total = valid_count + invalid_count + junk_count
-    print("valid: {}(unique: {} + dups: {}) + invalid: {} + junk: {} = total: {} entries, ({})".format(filename,
-                                                                                                       valid_count,
-                                                                                                       new_unique_count,
-                                                                                                       valid_count - new_unique_count,
-                                                                                                       invalid_count,
-                                                                                                       junk_count,
-                                                                                                       total_lines,
-                                                                                                       verify_total == verify_total))
+    print("valid: {}(unique: {} + dups: {}) + invalid: {} + junk: {} = total: {} entries, ({})".
+          format(filename, valid_count, new_unique_count, valid_count - new_unique_count,
+                 invalid_count, junk_count, total_lines, verify_total == verify_total))
     printstats(d)
     print('ext list:')
     print(d_ext)
@@ -285,8 +280,8 @@ def restore_dups(dir, d):
                     restored_failed_list.append(filename)
             isFirst = False
 
-    print('total: {}; found: {}; firsts: {}; restored: {}; restored_failed: {}'.format(total, totalfound, firstsFound,
-                                                                                       restored, restored_failed))
+    print('total: {}; found: {}; firsts: {}; restored: {}; restored_failed: {}'.
+          format(total, totalfound, firstsFound, restored, restored_failed))
 
 
 #
