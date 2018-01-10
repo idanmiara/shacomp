@@ -1,3 +1,4 @@
+import sys
 from shacomp import *
 from shacomp_plot import *
 

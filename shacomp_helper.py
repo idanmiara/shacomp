@@ -1,7 +1,7 @@
 import hashlib
 import collections
 import os
-
+import sys
 
 def sha512_file(file_name):
     sha512 = hashlib.sha512()
@@ -53,12 +53,29 @@ def save_tup_list(list, list_filename):
     text_file.close()
 
 
-def print_hashes(dir_name):
+def print_hashes(dir_name, list_filename = None, max_count = None):
+    if max_count is None:
+        max_count = sys.maxsize
+    else:
+        print('processing {} files'.format(max_count))
+
+    write_file = list_filename is not None
+    if write_file:
+        text_file = open(list_filename, "w", -1, "utf-8-sig")
+
+    i = 0
     for root, dirs, files in os.walk(dir_name, topdown=False):
         for name in files:
+            i = i+1
             filename = os.path.join(root, name)
             hash_val = sha512_file(filename)
-            print('{0} *{1}\n'.format(hash_val, filename))
-
-       # for name in dirs:
-       #    print(os.path.join(root, name))
+            s = '{0} *{1}\n'.format(hash_val, filename)
+            print('{}: {}'.format(i,s))
+            if write_file:
+                text_file.write(s)
+            if i >= max_count:
+                break
+        if i >= max_count:
+            break
+    if write_file:
+        text_file.close()

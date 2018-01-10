@@ -1,12 +1,10 @@
-import sys
-import glob, re, fnmatch, os
-import collections
+# import sys
+# import re, fnmatch, os
+# import collections
+# import numpy as np
+import glob
 import shutil
-
-import numpy as np
-
 from shacomp_helper import *
-
 
 sha_kind = 'sha512'
 
