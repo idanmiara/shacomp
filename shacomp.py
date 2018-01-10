@@ -2,37 +2,21 @@ import sys
 import glob, re, fnmatch, os
 import collections
 import shutil
-import hashlib
 
 import numpy as np
-# import matplotlib.pyplot as plt
 
-import matplotlib
+from shacomp_helper import *
 
-matplotlib.use('Qt5Agg')
-import matplotlib.pyplot as plt
 
 sha_kind = 'sha512'
 
 
-def plot(c):
-    # labels, values = zip(*Counter(['A','B','A','C','A','A']).items())
-    labels, values = zip(*c.items())
-
-    indexes = np.arange(len(labels))
-    width = 1
-
-    plt.bar(indexes, values, width)
-    plt.xticks(indexes + width * 0.5, labels)
-    plt.show()
-
-
-def isJunkFile(filename):
+def is_junk_file(filename):
     junk = ["thumbs.db", "desktop.ini", "picasa.ini", ".picasa.ini", "picasa.ini1", ".picasa.ini1"]
-    return (os.path.basename(filename).lower() in junk)
+    return os.path.basename(filename).lower() in junk
 
 
-def readfile(filename, d, d_ext, uniquelog=None, siglen=0):
+def read_file(filename, d, d_ext, uniquelog=None, siglen=0):
     # with open(filename, encoding="utf-8-sig").read().decode("utf-8-sig") as f:
     with open(filename, mode='r', encoding="utf-8-sig") as f:
         print("{} ...".format(filename))
@@ -47,7 +31,7 @@ def readfile(filename, d, d_ext, uniquelog=None, siglen=0):
         for line in f:
             # line=line.rstrip('\n')
             line = line.strip()
-            if (line == ''):
+            if line == '':
                 continue
             total_lines += 1
             kv = line.split(delim, 1)
@@ -56,7 +40,7 @@ def readfile(filename, d, d_ext, uniquelog=None, siglen=0):
             else:
                 key = kv[0].lower()
                 val = kv[1]
-                if isJunkFile(val):
+                if is_junk_file(val):
                     junk_count += 1
                 else:
                     # d.setdefault(key,[])
@@ -76,39 +60,12 @@ def readfile(filename, d, d_ext, uniquelog=None, siglen=0):
     print("valid: {}(unique: {} + dups: {}) + invalid: {} + junk: {} = total: {} entries, ({})".
           format(filename, valid_count, new_unique_count, valid_count - new_unique_count,
                  invalid_count, junk_count, total_lines, verify_total == verify_total))
-    printstats(d)
     print('ext list:')
     print(d_ext)
+    dict_stats(d)
 
 
-def printstats(d):
-    c, hist = sumDefaultDict(d)
-    total = sum(c.values())
-    print("dict stats: unique entries:{}/{}".format(len(d), total))
-    # plot(hist)
-    return c
-
-
-# returns a list of tuples [ (key val)...]
-def getUniqueTupListFromDict(d):
-    l = []
-    for key, value in d.items():
-        l.append((key, value[0]))  # append only key and first val
-    l.sort(key=lambda tup: tup[1])  # sorts in place
-    return l
-
-
-def saveTupList(l, filename):
-    text_file = open(filename, "w", -1, "utf-8-sig")
-    count = len(l)
-    for k, v in l:
-        s = '{0} *{1}\n'.format(k, v)
-        text_file.write(s)
-    print("Writing: {0}: {1} lines".format(filename, count))
-    text_file.close()
-
-
-# def readoutfile( d, filename):
+# def read_out_file(d, filename):
 #     with open(filename) as f:
 #         total_lines=0
 #         for line in f:
@@ -122,7 +79,7 @@ def saveTupList(l, filename):
 #             d[key] = val
 #     print("{0}: base lines: {1}".format(filename,total_lines))
 #
-# def writefile(d, filename):
+# def write_file(d, filename):
 #     od = collections.OrderedDict(sorted(d.items()))
 #     count = len(od)
 #     if count>0:
@@ -136,17 +93,7 @@ def saveTupList(l, filename):
 #         print("No items found!")
 
 
-def sumDefaultDict(d):
-    c = collections.Counter()  # for each key the value length
-    hist = collections.Counter()  # count the number of keys that have the same value length
-    for key, value in d.items():
-        l = len(value)  # number of entries for this key
-        c[key] = l
-        hist[l] += 1
-    return c, hist
-
-
-def read_write(dir, master, ext='.' + sha_kind):
+def read_write(dir_name, master, ext='.' + sha_kind):
     # d = {}
     # key = hash
     # value = list of files
@@ -154,20 +101,20 @@ def read_write(dir, master, ext='.' + sha_kind):
     d_ext = collections.Counter()
     # c = collections.Counter(value for values in d.itervalues() for value in values)
     # dir=os.getcwd()
-    if dir != '':
-        os.chdir(dir)
+    if dir_name != '':
+        os.chdir(dir_name)
 
     base_file = master + ext
     filename = base_file
     # if a base file is provided, read it, otherwise continue to read in alphabetical order
     if filename != '':
-        s = os.path.join(dir, filename)
+        s = os.path.join(dir_name, filename)
         if os.path.isfile(s):
             print("0:")
-            readfile(s, d, d_ext)
+            read_file(s, d, d_ext)
             print()
             # s = os.path.join(dir,filename+"-uniques"+ext)
-            # saveTupList(uniquelog, s)
+            # save_tup_list(unique_log, s)
 
     in_pattern = '*' + ext
     # for filename in re.compile(fnmatch.translate(in_pattern), re.IGNORECASE):
@@ -177,56 +124,50 @@ def read_write(dir, master, ext='.' + sha_kind):
         if filename == base_file or ("unique" in filename) or ("ignore" in filename):
             continue
         print('{}:'.format(sha_files_count))
-        s = os.path.join(dir, filename)
-        uniquelog = []
-        readfile(s, d, d_ext, uniquelog)
-        if len(uniquelog) > 0:
-            s = os.path.join(dir, os.path.splitext(filename)[0] + "-uniques" + ext)
-            saveTupList(uniquelog, s)
-        # writefile(d, os.path.join(dir, outfile))
-        print("{} new unique files from file:{}, base file:{}".format(len(uniquelog), filename, base_file))
+        s = os.path.join(dir_name, filename)
+        unique_log = []
+        read_file(s, d, d_ext, unique_log)
+        if len(unique_log) > 0:
+            s = os.path.join(dir_name, os.path.splitext(filename)[0] + "-uniques" + ext)
+            save_tup_list(unique_log, s)
+        # write_file(d, os.path.join(dir, outfile))
+        print("{} new unique files from file:{}, base file:{}".format(len(unique_log), filename, base_file))
         print()
         sha_files_count += 1
 
     print("\n---- finished loading {} sha files ---- \n".format(sha_files_count))
 
-    l = getUniqueTupListFromDict(d)
-    s = os.path.join(dir, "uniques" + ext)
-    saveTupList(l, s)
+    l = get_unique_tup_list_from_dict(d)
+    s = os.path.join(dir_name, "uniques" + ext)
+    save_tup_list(l, s)
+
     return d
 
 
-def sha512_file(fname):
-    hash = hashlib.sha512()
-    with open(fname, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash.update(chunk)
-    return hash.hexdigest()
-
-
-def del_dups(dir, d, verify_sha=True, verify_sha_allcopies=True):
-    print('delete dups from dir: {}'.format(dir))
+def delete_duplicates(dir_name, d, verify_sha=True, verify_sha_allcopies=True):
+    print('delete duplicates from dir: {}'.format(dir_name))
     total = 0
-    firsts = []
-    sha_ok = []
-    deleted = []
-    sha_err = []
     missing = []
+    sha_err = []
+    sha_ok = []
+    firsts = []
+    deleted = []
     for key, value in d.items():
-        copyfound = False
-        isFirst = True
+        copy_found = False
+        is_first = True
         for f in value:
-            filename = os.path.join(dir, f)
-            currfound = os.path.isfile(filename)
+            f = normpath1(f)
+            filename = os.path.join(dir_name, f)
+            curr_found = os.path.isfile(filename)
             total += 1
-            if currfound:
-                shahex = sha512_file(filename)
-                sha_verified = key == shahex
+            if curr_found:
+                sha_hex = sha512_file(filename)
+                sha_verified = key == sha_hex
                 if sha_verified:
                     sha_ok.append(filename)
-                    if isFirst:
+                    if is_first:
                         firsts.append(filename)
-                    isFirst = False
+                    is_first = False
                 else:
                     sha_err.append(filename)
                     print('err #{:5d}: {}'.format(len(sha_err), filename))
@@ -235,80 +176,47 @@ def del_dups(dir, d, verify_sha=True, verify_sha_allcopies=True):
                 print('mis #{:5d}: {}'.format(len(missing), filename))
                 sha_verified = False
 
-            if copyfound:
+            if copy_found:
                 # found a concrete duplicate
                 if sha_verified:
                     os.remove(filename)
                     deleted.append(filename)
                     print('del #{:5d}: {}'.format(len(deleted), filename))
             else:
-                copyfound = sha_verified
+                copy_found = sha_verified
 
-    print('total: {}; [missing: {}; sha_err: {}; sha_ok: {}; firsts: {}; deleted: {}'.
-          format(total, len(sha_ok), len(missing), len(sha_err), len(firsts), len(deleted)))
+    print('total: {} = [missing: {}; sha_err: {}; sha_ok: {} =(firsts: {}; deleted: {})]'.
+          format(total, len(missing), len(sha_err), len(sha_ok), len(firsts), len(deleted)))
 
 
-def restore_dups(dir, d):
-    restored = 0
-    restored_failed = []
+def restore_duplicates(dir_name, d):
     total = 0
-    totalfound = 0
-    firstsFound = 0
-    restored_list = []
-    restored_failed_list = []
+    found = []
+    firsts = []  # unique copies of different files
+    restored = []
+    restored_failed = []
     for key, value in d.items():
-        isFirst = True
-        thisSource = None
+        is_first = True
+        this_source = None
         for f in value:
-            filename = os.path.join(dir, f)
-            currfound = os.path.isfile(filename)
+            f = normpath1(f)
+            filename = os.path.join(dir_name, f)
+            curr_found = os.path.isfile(filename)
             total += 1
-            if currfound:
-                if isFirst:
-                    firstsFound += 1
-                totalfound += 1
-                if thisSource == None:
-                    thisSource = filename
+            if curr_found:
+                if is_first:
+                    firsts.append(firsts)
+                found.append(filename)
+                if this_source is None:
+                    this_source = filename
             else:
-                if thisSource != None:
-                    shutil.copyfile(thisSource, filename)
+                if this_source is not None:
+                    shutil.copyfile(this_source, filename)
                 if os.path.isfile(filename):
-                    restored += 1
-                    restored_list.append(filename)
+                    restored.append(filename)
                 else:
-                    restored_failed += 1
-                    restored_failed_list.append(filename)
-            isFirst = False
+                    restored_failed.append(filename)
+            is_first = False
 
-    print('total: {}; found: {}; firsts: {}; restored: {}; restored_failed: {}'.
-          format(total, totalfound, firstsFound, restored, restored_failed))
-
-
-#
-# if len(sys.argv) >= 2:
-#     dir = sys.argv[1]
-# else:
-#     dir = r''
-#
-# if len(sys.argv) >= 3:
-#     base_file = sys.argv[2]
-# else:
-#     base_file = 'base.txt'
-#
-# if len(sys.argv) >= 4:
-#     in_pattern = sys.argv[3]
-# else:
-#     in_pattern = '*.NEW'
-#
-# if len(sys.argv) >= 5:
-#     outfile = sys.argv[4]
-# else:
-#     outfile = 'NEW_PRICE_LIST.txt'
-
-# read_write(dir, base_file, in_pattern, outfile)
-# read_write(dir=r"d:\git\shacomp\sha2", master="Pictures-20170311")
-base_dir = r"d:\git\shacomp\sample"
-d = read_write(dir=base_dir, master="0")
-# del_dups(dir=base_dir, d=d)
-restore_dups(dir=base_dir, d=d)
-# os.system("pause")
+    print('total: {} = [found: {}; firsts: {}; restored: {}; restored_failed: {}]'.
+          format(total, len(found), len(firsts), len(restored), len(restored_failed)))
