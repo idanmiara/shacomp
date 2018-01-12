@@ -43,14 +43,19 @@ def get_unique_tup_list_from_dict(d):
     return l
 
 
+def save_list_to_file(lst, filename):
+    with open(filename, mode='w', encoding="utf-8-sig") as f:
+        for ele in lst:
+            f.write(ele + '\n')
+
+
 def save_tup_list(list, list_filename):
-    text_file = open(list_filename, "w", -1, "utf-8-sig")
-    count = len(list)
-    for hash_val, filename in list:
-        s = '{0} *{1}\n'.format(hash_val, filename) #hash *filename
-        text_file.write(s)
-    print("Writing: {0}: {1} lines".format(list_filename, count))
-    text_file.close()
+    with open(list_filename, "w", encoding="utf-8-sig") as f:
+        count = len(list)
+        for hash_val, filename in list:
+            s = '{0} *{1}\n'.format(hash_val, filename) #hash *filename
+            f.write(s)
+        print("Writing: {0}: {1} lines".format(list_filename, count))
 
 
 def print_hashes(dir_name, list_filename = None, max_count = None):
@@ -61,7 +66,7 @@ def print_hashes(dir_name, list_filename = None, max_count = None):
 
     write_file = list_filename is not None
     if write_file:
-        text_file = open(list_filename, "w", -1, "utf-8-sig")
+        text_file = open(list_filename, "w", encoding="utf-8-sig")
 
     i = 0
     for root, dirs, files in os.walk(dir_name, topdown=False):
