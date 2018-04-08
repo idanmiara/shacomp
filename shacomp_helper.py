@@ -49,7 +49,7 @@ def save_list_to_file(lst, filename):
             f.write(ele + '\n')
 
 
-def save_tup_list(list, list_filename):
+def save_sha_tup_list(list, list_filename):
     with open(list_filename, "w", encoding="utf-8-sig") as f:
         count = len(list)
         for hash_val, filename in list:
