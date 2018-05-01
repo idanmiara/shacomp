@@ -10,40 +10,6 @@ import time
 
 sha_kind = 'sha512'
 
-
-def load_sha_tuples(filename, sort=True):
-    # with open(filename, encoding="utf-8-sig").read().decode("utf-8-sig") as f:
-    with open(filename, mode='r', encoding="utf-8-sig") as f:
-        print("{} ...".format(filename))
-        delimiter = ' *'
-        total_lines = 0
-        invalid = []
-        tuple_list = []
-        for line in f:
-            # line=line.rstrip('\n')
-            line = line.strip()
-            if line == '':
-                continue
-            total_lines += 1
-            kv = line.split(delimiter, 1)
-            if len(kv) != 2:
-                invalid.append(line)
-            else:
-                key = kv[0].lower()
-                val = kv[1]
-                tuple_list.append([key, val])
-    if sort:
-        tuple_list.sort(key=lambda tup: tup[1])
-    return tuple_list
-
-
-def sort_sha(filename):
-    tuple_list = load_sha_tuples(filename)
-    filename1 = os.path.splitext(filename)
-    filename2 = filename1[0]+"-sorted"+filename1[1]
-    save_sha_tup_list(tuple_list, filename2)
-
-
 def is_junk_file(filename):
     junk = ["thumbs.db", "desktop.ini", "picasa.ini", ".picasa.ini", "picasa.ini1", ".picasa.ini1", ".nomedia"]
     filename = os.path.basename(filename).lower()
@@ -144,14 +110,14 @@ def read_write(dir_name, master, ext='.' + sha_kind, save_uniques_list = True, r
 
     sha_files_count = 1
     for filename in sorted(glob.glob(in_pattern)):
-        if filename == base_file or ("unique" in filename) or ("ignore" in filename):
+        if filename == base_file or ("unique" in filename) or (filename.startswith('_')):
             continue
         print('{}:'.format(sha_files_count))
         s = os.path.join(dir_name, filename)
         unique_log = []
         read_file(s, d, d_ext, unique_log=unique_log, read_junks=read_junks, sha_blacklist=sha_blacklist)
         if len(unique_log) > 0:
-            s = os.path.join(dir_name, os.path.splitext(filename)[0] + "-uniques" + ext)
+            s = os.path.join(dir_name, '_' + os.path.splitext(filename)[0] + "-uniques" + ext)
             save_sha_tup_list(unique_log, s)
         # write_file(d, os.path.join(dir, outfile))
         print("{} new unique files from file:{}, base file:{}".format(len(unique_log), filename, base_file))
@@ -162,12 +128,12 @@ def read_write(dir_name, master, ext='.' + sha_kind, save_uniques_list = True, r
 
     if save_uniques_list:
         l = get_unique_tup_list_from_dict(d)
-        s = os.path.join(dir_name, "uniques" + ext)
+        s = os.path.join(dir_name, '_uniques' + ext)
         save_sha_tup_list(l, s)
     return d
 
 
-def which_files_are_missing(d, data_dir_name, log_path, verify_sha=False):
+def look_for_missing_and_mismatch(d, data_dir_name, log_path, verify_sha=False):
     print('searching for missing files from dir: {}...'.format(data_dir_name))
     total = 0
     found = 0
@@ -199,40 +165,46 @@ def which_files_are_missing(d, data_dir_name, log_path, verify_sha=False):
           format(total, found, len(sha_err), len(missing_list)))
 
 
-def delete_junk(d, data_dir_name, junk_sha_list, delete_junk_filenames=True, sha_to_delete=set()):
-    print('delete junk dir: {}'.format(data_dir_name))
-    total_deleted_junk = 0
+def add_junk_tup_list(d, junk_sha_filename_tup_list, delete_junk_filename_templates=True, sha_to_delete_set=set()):
+    total_deleted_by_template = 0
     total_deleted_by_sha = 0
-    missing_count = 0
-    sha_err = []
-    deleted = []
     for key, files_list in d.items():
         for val in files_list:
             val = normpath1(val)
-            del_by_junk = delete_junk_filenames and is_junk_file(val)
-            del_by_sha = sha_to_delete and (key in sha_to_delete)
+            del_by_junk = delete_junk_filename_templates and is_junk_file(val)
+            del_by_sha = sha_to_delete_set and (key in sha_to_delete_set)
             if del_by_junk or del_by_sha:
-                filename = os.path.join(data_dir_name, val)
-                curr_found = os.path.isfile(filename)
                 if del_by_junk:
-                    total_deleted_junk += 1
+                    total_deleted_by_template += 1
+                    sha_to_delete_set.add(key)
                 else:
                     total_deleted_by_sha += 1
-                junk_sha_list.append([key, val])
-                if curr_found:
-                    sha_hex = sha512_file(filename)
-                    sha_verified = key == sha_hex
-                    if sha_verified:
-                        deleted.append(filename)
-                        os.remove(filename)
-                    else:
-                        sha_err.append(filename)
-                        print('err #{:5d}: {}'.format(len(sha_err), filename))
-                else:
-                    missing_count += 1
+                junk_sha_filename_tup_list.append([key, val])
+    print('total junk files added: by template: {} by sha: {}'.format(total_deleted_by_template, total_deleted_by_sha))
 
-    print('to be deleted junk: {} to be deleted sha: {} = [missing: {}; sha_err: {}; deleted: {}]'.
-          format(total_deleted_junk, total_deleted_by_sha, missing_count, len(sha_err), len(deleted)))
+
+def delete_junk(junk_sha_filename_tup_list, data_dir_name):
+    print('delete junk dir: {}'.format(data_dir_name))
+    missing_count = 0
+    sha_err_filenames = []
+    deleted_filenames = []
+    for key, val in junk_sha_filename_tup_list.items():
+        filename = os.path.join(data_dir_name, val)
+        curr_found = os.path.isfile(filename)
+        if curr_found:
+            sha_hex = sha512_file(filename)
+            sha_verified = key == sha_hex
+            if sha_verified:
+                deleted_filenames.append(filename)
+                os.remove(filename)
+            else:
+                sha_err_filenames.append(filename)
+                print('err #{:5d}: {}'.format(len(sha_err_filenames), filename))
+        else:
+            missing_count += 1
+
+    print('deleted files from junk file list = [missing: {}; sha_err: {}; deleted: {}]'.
+          format(missing_count, len(sha_err_filenames), len(deleted_filenames)))
 
 
 def delete_duplicates(dir_name, d, remove_log_filename, verify_sha=True, verify_sha_allcopies=True):

@@ -49,13 +49,32 @@ def save_list_to_file(lst, filename):
             f.write(ele + '\n')
 
 
-def save_sha_tup_list(list, list_filename):
-    with open(list_filename, "w", encoding="utf-8-sig") as f:
-        count = len(list)
-        for hash_val, filename in list:
+def save_sha_tup_list(tup_list, out_filename):
+    with open(out_filename, "w", encoding="utf-8-sig") as f:
+        count = len(tup_list)
+        for hash_val, filename in tup_list:
             s = '{0} *{1}\n'.format(hash_val, filename) #hash *filename
             f.write(s)
-        print("Writing: {0}: {1} lines".format(list_filename, count))
+        print("Writing: {0}: {1} lines".format(out_filename, count))
+
+
+def save_sha_set(sha_set, out_filename):
+    with open(out_filename, "w", encoding="utf-8-sig") as f:
+        count = len(sha_set)
+        for hash_val in sha_set:
+            s = '{0}\n'.format(hash_val) #hash *filename
+            f.write(s)
+        print("Writing: {0}: {1} lines".format(out_filename, count))
+
+
+def load_sha_set(sha_set, out_filename):
+    with open(out_filename, "r", encoding="utf-8-sig") as f:
+        for line in f:
+            line = line.strip()
+            if line == '':
+                continue
+            sha_set.add(line)
+    print("sha set length".format, len(sha_set))
 
 
 def print_hashes(dir_name, list_filename = None, max_count = None):
@@ -84,3 +103,37 @@ def print_hashes(dir_name, list_filename = None, max_count = None):
             break
     if write_file:
         text_file.close()
+
+
+def load_sha_tuples(filename, sort=True):
+    # with open(filename, encoding="utf-8-sig").read().decode("utf-8-sig") as f:
+    with open(filename, mode='r', encoding="utf-8-sig") as f:
+        print("{} ...".format(filename))
+        delimiter = ' *'
+        total_lines = 0
+        invalid = []
+        tuple_list = []
+        for line in f:
+            # line=line.rstrip('\n')
+            line = line.strip()
+            if line == '':
+                continue
+            total_lines += 1
+            kv = line.split(delimiter, 1)
+            if len(kv) != 2:
+                invalid.append(line)
+            else:
+                key = kv[0].lower()
+                val = kv[1]
+                tuple_list.append([key, val])
+    if sort:
+        tuple_list.sort(key=lambda tup: tup[1])
+    return tuple_list
+
+
+def sort_sha(filename):
+    tuple_list = load_sha_tuples(filename)
+    filename1 = os.path.splitext(filename)
+    filename2 = filename1[0]+"-sorted"+filename1[1]
+    save_sha_tup_list(tuple_list, filename2)
+
