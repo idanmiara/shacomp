@@ -3,6 +3,8 @@ import collections
 import os
 import sys
 
+import shacomp_plot
+
 def sha512_file(file_name):
     sha512 = hashlib.sha512()
     with open(file_name, "rb") as f:
@@ -20,18 +22,28 @@ def normpath1(f):
 def sum_default_dict(d):
     copies_per_hash = collections.Counter()  # for each key the value length
     copies_hist = collections.Counter()  # count the number of keys that have the same value length
-    for key, value in d.items():
-        length = len(value)  # number of entries for this key
+    ext_hist = collections.Counter()  # count the number of keys per ext
+    for key, files_list in d.items():
+        length = len(files_list)  # number of entries for this key
         copies_per_hash[key] = length
         copies_hist[length] += 1
-    return copies_per_hash, copies_hist
+        for f in files_list:
+            ext = os.path.split(f)[1]
+            ext_hist[ext] += 1
+    return copies_per_hash, copies_hist, ext_hist
 
 
-def dict_stats(d):
+def dict_stats(d, do_plot=False):
     # copies_hist - how many files (value) have (key) copies
-    copies_per_hash, _ = sum_default_dict(d)
+    copies_per_hash, copies_hist, ext_hist = sum_default_dict(d)
     total = sum(copies_per_hash.values())
     print("dict stats: unique entries:{}/{}".format(len(d), total))
+
+    if do_plot:
+        print('print copies hist')
+        shacomp_plot.my_plot(copies_hist)
+        print('print ext hist')
+        shacomp_plot.my_plot(ext_hist)
 
 
 # returns a list of tuples [ (key val)...]

@@ -7,13 +7,13 @@ import shutil
 from shacomp_helper import *
 
 import time
+import shacomp_lists
 
 sha_kind = 'sha512'
 
 def is_junk_file(filename):
-    junk = ["thumbs.db", "desktop.ini", "picasa.ini", ".picasa.ini", "picasa.ini1", ".picasa.ini1", ".nomedia"]
     filename = os.path.basename(filename).lower()
-    return filename in junk
+    return filename in shacomp_lists.junk
 
 
 def do_all_dups_have_same_ext(d, ext_whitelist=None, sha_blacklist=set()):
