@@ -19,5 +19,4 @@ def my_plot(c):
 
     plt.bar(indexes, values, width)
     plt.xticks(indexes + width * 0.5, labels)
-    plt.show()
 

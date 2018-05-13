@@ -2,8 +2,11 @@ import hashlib
 import collections
 import os
 import sys
+# from natsort import natsorted
+# import natsort as ns
 
 import shacomp_plot
+import matplotlib.pyplot as plt
 
 def sha512_file(file_name):
     sha512 = hashlib.sha512()
@@ -40,10 +43,21 @@ def dict_stats(d, do_plot=False):
     print("dict stats: unique entries:{}/{}".format(len(d), total))
 
     if do_plot:
-        print('print copies hist')
+        print('plotting histograms')
+        # plt.subplot(211)
+        # plt.ylabel('copies per hash')
+        # shacomp_plot.my_plot(copies_per_hash)
+
+        plt.subplot(211)
+        plt.ylabel('copies hist')
         shacomp_plot.my_plot(copies_hist)
-        print('print ext hist')
+
+        plt.subplot(212)
+        plt.ylabel('ext hist')
         shacomp_plot.my_plot(ext_hist)
+
+        plt.show()
+
 
 
 # returns a list of tuples [ (key val)...]
@@ -51,7 +65,8 @@ def get_unique_tup_list_from_dict(d):
     l = []
     for key, value in d.items():
         l.append((key, value[0]))  # append only key and first val
-    l.sort(key=lambda tup: tup[1])  # sorts in place
+    l.sort(key=lambda tup: tup[1].lower())  # sorts in place
+    # ns.natsorted(l, key=lambda tup: tup[1], alg=ns.PATH)
     return l
 
 
@@ -70,17 +85,17 @@ def save_sha_tup_list(tup_list, out_filename):
         print("Writing: {0}: {1} lines".format(out_filename, count))
 
 
-def save_sha_set(sha_set, out_filename):
-    with open(out_filename, "w", encoding="utf-8-sig") as f:
+def save_sha_set(sha_set, filename):
+    with open(filename, "w", encoding="utf-8-sig") as f:
         count = len(sha_set)
         for hash_val in sha_set:
             s = '{0}\n'.format(hash_val) #hash *filename
             f.write(s)
-        print("Writing: {0}: {1} lines".format(out_filename, count))
+        print("Writing: {0}: {1} lines".format(filename, count))
 
 
-def load_sha_set(sha_set, out_filename):
-    with open(out_filename, "r", encoding="utf-8-sig") as f:
+def load_sha_set(sha_set, filename):
+    with open(filename, "r", encoding="utf-8-sig") as f:
         for line in f:
             line = line.strip()
             if line == '':
@@ -139,7 +154,9 @@ def load_sha_tuples(filename, sort=True):
                 val = kv[1]
                 tuple_list.append([key, val])
     if sort:
-        tuple_list.sort(key=lambda tup: tup[1])
+        tuple_list.sort(key=lambda tup: tup[1].lower())
+        # ns.natsorted(tuple_list, key=lambda tup: tup[1], alg=ns.PATH)
+
     return tuple_list
 
 
