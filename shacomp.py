@@ -166,24 +166,6 @@ def look_for_missing_and_mismatch(d, data_dir_name, log_path, verify_sha=False):
           format(total, found, len(sha_err), len(missing_list)))
 
 
-def add_junk_tup_list(d, junk_sha_filename_tup_list, delete_junk_filename_templates=True, sha_to_delete_set=set()):
-    total_deleted_by_template = 0
-    total_deleted_by_sha = 0
-    for key, files_list in d.items():
-        for val in files_list:
-            val = normpath1(val)
-            del_by_junk = delete_junk_filename_templates and is_junk_file(val)
-            del_by_sha = sha_to_delete_set and (key in sha_to_delete_set)
-            if del_by_junk or del_by_sha:
-                if del_by_junk:
-                    total_deleted_by_template += 1
-                    sha_to_delete_set.add(key)
-                else:
-                    total_deleted_by_sha += 1
-                junk_sha_filename_tup_list.append([key, val])
-    print('total junk files added: by template: {} by sha: {}'.format(total_deleted_by_template, total_deleted_by_sha))
-
-
 def delete_from_list(sha_filename_to_delete_tup_list, data_dir, actually_delete, remove_log_filename=None):
     if remove_log_filename:
         files_remove_log = open(remove_log_filename, "a+")
@@ -215,50 +197,102 @@ def delete_from_list(sha_filename_to_delete_tup_list, data_dir, actually_delete,
           format(missing_count, len(sha_err_filenames), len(deleted_filenames)))
 
 
-def delete_duplicates(data_dir, d, junk_sha_filename_tup_list, verify_sha=True, verify_sha_allcopies=True, actually_delete=False):
+def delete_duplicates(
+        data_dir, d, junk_sha_filename_tup_list,
+        delete_junk_filename_templates=True, sha_to_delete_set=set(),
+        delete_dups=True,
+        verify_file_existance=True, verify_sha=True, verify_sha_allcopies=True, actually_delete=False,
+        do_prints=False, save_lists_prefix=None):
     print('delete duplicates from dir: {}'.format(data_dir))
     total = 0
+
     missing = []
     sha_err = []
     sha_ok = []
     firsts = []
-    deleted = []
+    delete_by_dup = []
+    delete_by_template = []
+    delete_by_sha = []
+
+    all_lists = [
+        ('missing', missing),
+        ('sha_err', sha_err),
+        ('sha_ok', sha_ok),
+        ('firsts', firsts),
+        ('delete_by_dup', delete_by_dup),
+        ('delete_by_template', delete_by_template),
+        ('delete_by_sha', delete_by_sha),
+    ]
+
+    if not data_dir:
+        verify_file_existance = False
+    if not verify_file_existance:
+        verify_sha = False
+    if not verify_sha:
+        verify_sha_allcopies = False
+
     for key, files_list in d.items():
         copy_found = False
         is_first = True
         for val in files_list:
             val = normpath1(val)
-            filename = os.path.join(data_dir, val)
-            curr_found = os.path.isfile(filename)
             total += 1
-            if curr_found:
-                sha_hex = sha512_file(filename)
-                sha_verified = key == sha_hex
-                if sha_verified:
-                    sha_ok.append(filename)
-                    if is_first:
-                        firsts.append(filename)
-                    is_first = False
-                else:
-                    sha_err.append(filename)
-                    print('err #{:5d}: {}'.format(len(sha_err), filename))
-            else:
-                missing.append(filename)
-                print('mis #{:5d}: {}'.format(len(missing), filename))
-                sha_verified = False
+            delete_this_file = False
+            kv = [key, val]
 
-            if copy_found:
-                # found a concrete duplicate
-                if sha_verified:
-                    junk_sha_filename_tup_list.append([key, val])
-                    deleted.append(filename)
-                    if actually_delete:
-                        os.remove(filename)
-                    print('del #{:5d}: {}'.format(len(deleted), filename))
-            else:
-                copy_found = sha_verified
-    print('total: {} = [missing: {}; sha_err: {}; sha_ok: {} =(firsts: {}; deleted: {})]'.
-          format(total, len(missing), len(sha_err), len(sha_ok), len(firsts), len(deleted)))
+            if delete_junk_filename_templates and is_junk_file(val):
+                delete_this_file = True
+                # sha_to_delete_set.add(key)
+                delete_by_template.append(kv)
+            elif sha_to_delete_set and (key in sha_to_delete_set):
+                delete_this_file = True
+                delete_by_sha.append(kv)
+            elif delete_dups:
+                if verify_file_existance:
+                    filename = os.path.join(data_dir, val)
+                else:
+                    filename = val
+                curr_found = (not verify_file_existance) or os.path.isfile(filename)
+                if curr_found:
+                    if (is_first and verify_sha) or (not is_first and verify_sha_allcopies):
+                        sha_verified = (not verify_sha) or (key == sha512_file(filename))
+                    else:
+                        sha_verified = True
+                    if sha_verified:
+                        sha_ok.append(kv)
+                        if is_first:
+                            firsts.append(kv)
+                        is_first = False
+                    else:
+                        sha_err.append(kv)
+                        if do_prints:
+                            print('err #{:5d}: {}'.format(len(sha_err), filename))
+                else:
+                    sha_verified = False
+                    missing.append(filename)
+                    if do_prints:
+                        print('mis #{:5d}: {}'.format(len(missing), filename))
+
+                if copy_found:
+                    # found a concrete duplicate
+                    if sha_verified:
+                        delete_this_file = True
+                        delete_by_dup.append(kv)
+                        if do_prints:
+                            print('del #{:5d}: {}'.format(len(delete_by_dup), filename))
+                else:
+                    copy_found = sha_verified
+            if delete_this_file:
+                junk_sha_filename_tup_list.append(kv)
+                if actually_delete:
+                    os.remove(filename)
+    print('total junk files: by template: {} by sha: {}'.format(len(delete_by_template), len(delete_by_sha)))
+    print('total: {} = [missing: {}; sha_err: {}; sha_ok: {} =(firsts: {}; delete_by_dup: {})]'.
+          format(total, len(missing), len(sha_err), len(sha_ok), len(firsts), len(delete_by_dup)))
+    if save_lists_prefix:
+        for name, tup_list in all_lists:
+            filename = os.path.join(save_lists_prefix, name)
+            save_sha_tup_list(tup_list, filename)
 
 
 def restore_duplicates(dir_name, d):

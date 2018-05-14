@@ -57,7 +57,7 @@ if check_nonconsistant_exts_keys:
         print('solve this first')
         exit(1)
 
-# are there any missing files? i.e. in dict but not in disk
+# are there any missing files? i.e. in dict but not on disk
 # 2 logs will be created: 1. files with mismatch sha, 2. files that are missing
 # if not verify_sha then only look for missing files
 do_look_for_missing_and_mismatch = False
@@ -67,18 +67,16 @@ if do_look_for_missing_and_mismatch:
 # after removing all nonconsistant_exts_keys by renaming/classifiying as junk we'll delete all the junk files:
 # 1. junk sha that we found (empty files, non-consistant-ext, others)
 # 2. junk filename by template filenames
+# add duplicates to the sha_filename list after verifying sha
 # we'll keep a list of (sha,filename) tups of all files that we classified as junk and deleted them
 sha_filename_to_delete_tup_list = []
-do_generate_junk_sha = False
-if do_generate_junk_sha:
+prepare_delete_list = True
+if prepare_delete_list:
     sha_to_delete_set = shacomp_lists.sha_blacklist  # {zero_sha}
-    add_junk_tup_list(d=global_dict, junk_sha_filename_tup_list=sha_filename_to_delete_tup_list, delete_junk_filename_templates=True, sha_to_delete_set=sha_to_delete_set)
+    delete_duplicates(d=global_dict, junk_sha_filename_tup_list=sha_filename_to_delete_tup_list,
+                      delete_junk_filename_templates=True, sha_to_delete_set=sha_to_delete_set,
+                      data_dir=data_path, verify_sha=True)
     save_sha_set(sha_to_delete_set, junk_sha_filename)
-
-# add duplicates to the sha_filename list after verifying sha
-do_delete_duplicates = True
-if do_delete_duplicates:
-    delete_duplicates(d=global_dict, junk_sha_filename_tup_list=sha_filename_to_delete_tup_list, data_dir=data_path, verify_sha=True)
 
 
 save_sha_tup_list(sha_filename_to_delete_tup_list, os.path.join(sha_path, '_deleted.sha512'))
