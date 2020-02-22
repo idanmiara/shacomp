@@ -4,7 +4,8 @@
 # matplotlib.use('Qt5Agg')
 
 import sys
-from shacomp.main import *
+import os
+import shacomp.main as shc
 from shacomp import lists
 import shacomp.helper as hlp
 
@@ -45,8 +46,8 @@ if os.path.isfile(junk_sha_filename):
 # key = sha; val = list of all filenames with that sha
 # junk = files that should be deleted as shacomp_lists.junk
 # read sorted(*.sha512) files, and adding them to the dict, starting from master file then alphabetically
-# global_dict = read_write(dir_name=sha_path, master=master, save_uniques_list=False, read_junks=False, sha_blacklist={zero_sha})
-global_dict = read_write(dir_name=sha_path, master=master, save_uniques_list=False, read_underscore_folders=False,
+# global_dict = shc.read_write(dir_name=sha_path, master=master, save_uniques_list=False, read_junks=False, sha_blacklist={zero_sha})
+global_dict = shc.read_write(dir_name=sha_path, master=master, save_uniques_list=False, read_underscore_folders=False,
                          read_junks=False, sha_blacklist=lists.sha_blacklist)
 
 # non_whitelist_ext_files =
@@ -54,7 +55,7 @@ global_dict = read_write(dir_name=sha_path, master=master, save_uniques_list=Fal
 # returns the keys of all files in the dict that have different ext per key, thus probably junk.
 check_non_consistent_exts_keys = False
 if check_non_consistent_exts_keys:
-    non_consistent_exts_keys = do_all_dups_have_same_ext(global_dict, ext_whitelist=lists.ext_whitelist,
+    non_consistent_exts_keys = shc.do_all_dups_have_same_ext(global_dict, ext_whitelist=lists.ext_whitelist,
                                                          sha_blacklist=lists.sha_blacklist)
     print('list of sha with mismatch extensions: {}'.format(non_consistent_exts_keys))
     if non_consistent_exts_keys:
@@ -66,7 +67,7 @@ if check_non_consistent_exts_keys:
 # if not verify_sha then only look for missing files
 do_look_for_missing_and_mismatch = False
 if do_look_for_missing_and_mismatch:
-    look_for_missing_and_mismatch(global_dict, data_dir_name=data_path, log_path=sha_path, verify_sha=False)
+    shc.look_for_missing_and_mismatch(global_dict, data_dir_name=data_path, log_path=sha_path, verify_sha=False)
 
 # after removing all non_consistent_exts_keys by renaming/classifying as junk we'll delete all the junk files:
 # 1. junk sha that we found (empty files, non-non_consistent-ext, others)
@@ -77,7 +78,7 @@ sha_filename_to_delete_tup_list = []
 prepare_delete_list = True
 if prepare_delete_list:
     sha_to_delete_set = lists.sha_blacklist  # {zero_sha}
-    delete_duplicates(d=global_dict, junk_sha_filename_tup_list=sha_filename_to_delete_tup_list,
+    shc.delete_duplicates(d=global_dict, junk_sha_filename_tup_list=sha_filename_to_delete_tup_list,
                       delete_junk_filename_templates=True, sha_to_delete_set=sha_to_delete_set,
                       data_dir=data_path, verify_sha=True)
     hlp.save_sha_set(sha_to_delete_set, junk_sha_filename)
@@ -87,7 +88,7 @@ actually_delete = False
 do_delete = False
 files_remove_log = 'deleted_files_log.txt'
 if do_delete:
-    delete_from_list(sha_filename_to_delete_tup_list=sha_filename_to_delete_tup_list, data_dir=data_path,
+    shc.delete_from_list(sha_filename_to_delete_tup_list=sha_filename_to_delete_tup_list, data_dir=data_path,
                      actually_delete=actually_delete, files_remove_log=files_remove_log)
 
 hlp.dict_stats(global_dict, do_plot=False)
