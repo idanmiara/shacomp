@@ -1,19 +1,20 @@
 # import sys
 # import re, fnmatch, os
-# import collections
-# import numpy as np
+import collections
 import glob
 import shutil
-from shacomp_helper import *
+import os
+import shacomp.helper as hlp
 
 import time
-import shacomp_lists
+from shacomp import lists
 
 sha_kind = 'sha512'
 
+
 def is_junk_file(filename):
     filename = os.path.basename(filename).lower()
-    return filename in shacomp_lists.junk
+    return filename in lists.junk
 
 
 # returns the keys of all files that exist
@@ -32,13 +33,13 @@ def do_all_dups_have_same_ext(d, ext_whitelist=None, sha_blacklist=set()):
                 is_first = False
                 ext0 = ext
             else:
-                if not shacomp_lists.is_interchangable_ext(ext0, ext):
+                if not lists.is_interchangeable_ext(ext0, ext):
                     diff_ext.append(key)
     return diff_ext
 
 
 def read_file(filename, d, d_ext, unique_log=None, sig_len=0, read_junks=False, read_underscore_folders=False, sha_blacklist=set()):
-    tuple_list = load_sha_tuples(filename)
+    tuple_list = hlp.load_sha_tuples(filename)
 
     valid_count = 0
     total_lines = 0
@@ -78,7 +79,7 @@ def read_file(filename, d, d_ext, unique_log=None, sig_len=0, read_junks=False, 
                  invalid_count, junk_count, blacklisted_keys, total_lines, verify_total == verify_total))
     print('ext list:')
     print(d_ext)
-    dict_stats(d)
+    hlp.dict_stats(d)
 
 
 def read_write(dir_name, master, ext='.' + sha_kind, save_uniques_list = True, read_underscore_folders=False, read_junks=False, sha_blacklist=set()):
@@ -119,7 +120,7 @@ def read_write(dir_name, master, ext='.' + sha_kind, save_uniques_list = True, r
         read_file(s, d, d_ext, unique_log=unique_log, read_junks=read_junks, read_underscore_folders=read_underscore_folders, sha_blacklist=sha_blacklist)
         if len(unique_log) > 0:
             s = os.path.join(dir_name, '_' + os.path.splitext(filename)[0] + "-uniques" + ext)
-            save_sha_tup_list(unique_log, s)
+            hlp.save_sha_tup_list(unique_log, s)
         # write_file(d, os.path.join(dir, outfile))
         print("{} new unique files from file:{}, base file:{}".format(len(unique_log), filename, base_file))
         print()
@@ -130,7 +131,7 @@ def read_write(dir_name, master, ext='.' + sha_kind, save_uniques_list = True, r
     if save_uniques_list:
         l = get_unique_tup_list_from_dict(d)
         s = os.path.join(dir_name, '_uniques' + ext)
-        save_sha_tup_list(l, s)
+        hlp.save_sha_tup_list(l, s)
     return d
 
 
@@ -143,13 +144,13 @@ def look_for_missing_and_mismatch(d, data_dir_name, log_path, verify_sha=False):
     for key, files_list in d.items():
         for f in files_list:
             total += 1
-            f = normpath1(f)
+            f = hlp.normpath1(f)
             filename = os.path.join(data_dir_name, f)
             curr_found = os.path.isfile(filename)
             if curr_found:
                 found += 1
                 if verify_sha:
-                    sha_hex = sha512_file(filename)
+                    sha_hex = hlp.sha512_file(filename)
                     sha_verified = key == sha_hex
                     if not sha_verified:
                         sha_err.append(filename)
@@ -159,9 +160,9 @@ def look_for_missing_and_mismatch(d, data_dir_name, log_path, verify_sha=False):
 
     time_str = time.strftime("%Y%m%d-%H%M%S")
     if sha_err:
-        save_list_to_file(sha_err, os.path.join(log_path, 'sha_err_'+time_str+'.txt'))
+        hlp.save_list_to_file(sha_err, os.path.join(log_path, 'sha_err_'+time_str+'.txt'))
     if missing_list:
-        save_list_to_file(missing_list, os.path.join(log_path, 'missing_list_'+time_str+'.txt'))
+        hlp.save_list_to_file(missing_list, os.path.join(log_path, 'missing_list_'+time_str+'.txt'))
     print('total:{} found:{} sha_err:{} missing:{} '.
           format(total, found, len(sha_err), len(missing_list)))
 
@@ -177,7 +178,7 @@ def delete_from_list(sha_filename_to_delete_tup_list, data_dir, actually_delete,
         filename = os.path.join(data_dir, val)
         curr_found = os.path.isfile(filename)
         if curr_found:
-            sha_hex = sha512_file(filename)
+            sha_hex = hlp.sha512_file(filename)
             sha_verified = key == sha_hex
             if sha_verified:
                 deleted_filenames.append(filename)
@@ -235,7 +236,7 @@ def delete_duplicates(
         copy_found = False
         is_first = True
         for val in files_list:
-            val = normpath1(val)
+            val = hlp.normpath1(val)
             total += 1
             delete_this_file = False
             kv = [key, val]
@@ -255,7 +256,7 @@ def delete_duplicates(
                 curr_found = (not verify_file_existance) or os.path.isfile(filename)
                 if curr_found:
                     if (is_first and verify_sha) or (not is_first and verify_sha_allcopies):
-                        sha_verified = (not verify_sha) or (key == sha512_file(filename))
+                        sha_verified = (not verify_sha) or (key == hlp.sha512_file(filename))
                     else:
                         sha_verified = True
                     if sha_verified:
@@ -292,7 +293,7 @@ def delete_duplicates(
     if save_lists_prefix:
         for name, tup_list in all_lists:
             filename = os.path.join(save_lists_prefix, name)
-            save_sha_tup_list(tup_list, filename)
+            hlp.save_sha_tup_list(tup_list, filename)
 
 
 def restore_duplicates(dir_name, d):
@@ -305,7 +306,7 @@ def restore_duplicates(dir_name, d):
         is_first = True
         this_source = None
         for f in value:
-            f = normpath1(f)
+            f = hlp.normpath1(f)
             filename = os.path.join(dir_name, f)
             curr_found = os.path.isfile(filename)
             total += 1

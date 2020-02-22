@@ -1,12 +1,14 @@
-import hashlib
-import collections
+import glob
 import os
 import sys
+import hashlib
+import collections
+import time
 # from natsort import natsorted
 # import natsort as ns
 
-import shacomp_plot
-import matplotlib.pyplot as plt
+from shacomp.timer import Timer
+
 
 def sha512_file(file_name):
     sha512 = hashlib.sha512()
@@ -34,30 +36,6 @@ def sum_default_dict(d):
             ext = os.path.split(f)[1]
             ext_hist[ext] += 1
     return copies_per_hash, copies_hist, ext_hist
-
-
-def dict_stats(d, do_plot=False):
-    # copies_hist - how many files (value) have (key) copies
-    copies_per_hash, copies_hist, ext_hist = sum_default_dict(d)
-    total = sum(copies_per_hash.values())
-    print("dict stats: unique entries:{}/{}".format(len(d), total))
-
-    if do_plot:
-        print('plotting histograms')
-        # plt.subplot(211)
-        # plt.ylabel('copies per hash')
-        # shacomp_plot.my_plot(copies_per_hash)
-
-        plt.subplot(211)
-        plt.ylabel('copies hist')
-        shacomp_plot.my_plot(copies_hist)
-
-        plt.subplot(212)
-        plt.ylabel('ext hist')
-        shacomp_plot.my_plot(ext_hist)
-
-        plt.show()
-
 
 
 # returns a list of tuples [ (key val)...]
@@ -166,3 +144,69 @@ def sort_sha(filename):
     filename2 = filename1[0]+"-sorted"+filename1[1]
     save_sha_tup_list(tuple_list, filename2)
 
+
+def make_signatures(path, base_path, output_root, use_cache=True):
+    timestr = time.strftime("%Y%m%d-%H%M%S")
+    output_filename = os.path.join(output_root, timestr + '.sha512')
+
+    fail_filename = os.path.join(output_root, timestr+'_failed.txt')
+    not_file_filename = os.path.join(output_root, timestr+'_not_file.txt')
+
+    print(path)
+    reverse_dict = {}
+
+    if use_cache:
+        for filename in sorted(glob.glob(os.path.join(output_root, '**\*.sha512'), recursive=True)):
+            if os.path.isfile(filename):
+                tuple_list = load_sha_tuples(filename)
+                for k, v in tuple_list:
+                    reverse_dict[v] = k
+
+    sha_output_file = open(output_filename, "w", encoding="utf-8-sig")
+    failed_file = None
+    not_files_file = None
+    good_count = 0
+    failed_count = 0
+    not_files_count = 0
+    with Timer():
+        print('start reading files to sha...')
+        for filename in sorted(glob.glob(path, recursive=True)):
+            if os.path.isdir(filename):
+                continue
+            rel_filename = os.path.relpath(filename, base_path)
+            if not os.path.isfile(filename):
+                not_files_count += 1
+                if not_files_file is None:
+                    print("not files: {0}: {1} lines".format(rel_filename, not_files_count))
+                    not_files_file = open(not_file_filename, "w")
+                    not_files_file.flush()
+                not_files_file.write(rel_filename)
+                continue
+            try:
+                if good_count == 0:
+                    print('read first file...')
+                good_count += 1
+                if rel_filename in reverse_dict:
+                    hash_val = reverse_dict[rel_filename]
+                else:
+                    hash_val = sha512_file(filename)
+                s = '{0} *{1}\n'.format(hash_val, rel_filename)
+                sha_output_file.write(s)
+                if good_count % 100 == 0:
+                    print("Writing: {0}: {1} lines".format(rel_filename, good_count))
+                    sha_output_file.flush()
+            except:
+                failed_count += 1
+                if failed_file is None:
+                    print("failed: {0}: {1} lines".format(rel_filename, failed_count))
+                    failed_file = open(fail_filename, "w")
+                    failed_file.flush()
+                failed_file.write(rel_filename)
+
+    print("done! count: {0}: filed: {1} not_files_count: {2}".format(good_count, failed_count, not_files_count))
+
+    sha_output_file.close()
+    if failed_file is not None:
+        failed_file.close()
+    if not_files_file is not None:
+        not_files_file.close()
