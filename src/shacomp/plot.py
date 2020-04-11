@@ -1,8 +1,8 @@
+import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 
-import matplotlib
-matplotlib.use('Qt5Agg')
-import matplotlib.pyplot as plt
+matplotlib.use("Qt5Agg")
 
 
 def my_plot(c):
@@ -19,4 +19,3 @@ def my_plot(c):
 
     plt.bar(indexes, values, width)
     plt.xticks(indexes + width * 0.5, labels)
-

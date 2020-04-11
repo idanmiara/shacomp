@@ -2,14 +2,14 @@
 # import re, fnmatch, os
 import collections
 import glob
-import shutil
 import os
-import shacomp.helper as hlp
-
+import shutil
 import time
-from shacomp import lists
 
-sha_kind = 'sha512'
+from src import shacomp as hlp
+from src.shacomp import lists, plot_dict
+
+sha_kind = "sha512"
 
 
 def is_junk_file(filename):
@@ -38,7 +38,9 @@ def do_all_dups_have_same_ext(d, ext_whitelist=None, sha_blacklist=set()):
     return diff_ext
 
 
-def read_file(filename, d, d_ext, unique_log=None, sig_len=0, read_junks=False, read_underscore_folders=False, sha_blacklist=set()):
+def read_file(
+    filename, d, d_ext, unique_log=None, sig_len=0, read_junks=False, read_underscore_folders=False, sha_blacklist=set()
+):
     tuple_list = hlp.load_sha_tuples(filename)
 
     valid_count = 0
@@ -55,7 +57,7 @@ def read_file(filename, d, d_ext, unique_log=None, sig_len=0, read_junks=False, 
         else:
             key = kv[0].lower()
             val = kv[1]
-            if ((not read_junks) and is_junk_file(val)) or ((not read_underscore_folders) and val.startswith('_')):
+            if ((not read_junks) and is_junk_file(val)) or ((not read_underscore_folders) and val.startswith("_")):
                 junk_count += 1
             elif key in sha_blacklist:
                 blacklisted_keys += 1
@@ -74,15 +76,33 @@ def read_file(filename, d, d_ext, unique_log=None, sig_len=0, read_junks=False, 
     # unique_count = len(d)
     invalid_count = len(invalid)
     verify_total = valid_count + invalid_count + junk_count + blacklisted_keys
-    print("{}... valid: {}(unique: {} + dups: {}) + invalid: {} + junk: {} + blacklisted_keys: {} = total: {} entries, ({})".
-          format(filename, valid_count, new_unique_count, valid_count - new_unique_count,
-                 invalid_count, junk_count, blacklisted_keys, total_lines, verify_total == verify_total))
-    print('ext list:')
+    print(
+        "{}... valid: {}(unique: {} + dups: {}) + invalid: {} + junk: {} + blacklisted_keys: {} = total: {} entries, ({})".format(
+            filename,
+            valid_count,
+            new_unique_count,
+            valid_count - new_unique_count,
+            invalid_count,
+            junk_count,
+            blacklisted_keys,
+            total_lines,
+            verify_total == verify_total,
+        )
+    )
+    print("ext list:")
     print(d_ext)
-    hlp.dict_stats(d)
+    plot_dict.dict_stats(d)
 
 
-def read_write(dir_name, master, ext='.' + sha_kind, save_uniques_list = True, read_underscore_folders=False, read_junks=False, sha_blacklist=set()):
+def read_write(
+    dir_name,
+    master,
+    ext="." + sha_kind,
+    save_uniques_list=True,
+    read_underscore_folders=False,
+    read_junks=False,
+    sha_blacklist=set(),
+):
     # d = {}
     # key = hash
     # value = list of files
@@ -90,36 +110,51 @@ def read_write(dir_name, master, ext='.' + sha_kind, save_uniques_list = True, r
     d_ext = collections.Counter()
     # c = collections.Counter(value for values in d.itervalues() for value in values)
     # dir=os.getcwd()
-    if dir_name != '':
+    if dir_name != "":
         os.chdir(dir_name)
 
     base_file = master + ext
     filename = base_file
     # if a base file is provided, read it, otherwise continue to read in alphabetical order
-    if filename != '':
+    if filename != "":
         s = os.path.join(dir_name, filename)
         if os.path.isfile(s):
             print("0:")
-            read_file(s, d, d_ext, read_junks=read_junks, read_underscore_folders=read_underscore_folders, sha_blacklist=sha_blacklist)
+            read_file(
+                s,
+                d,
+                d_ext,
+                read_junks=read_junks,
+                read_underscore_folders=read_underscore_folders,
+                sha_blacklist=sha_blacklist,
+            )
             print()
             # s = os.path.join(dir,filename+"-uniques"+ext)
             # save_tup_list(unique_log, s)
         else:
-            print('master not found: {}...'.format(s))
+            print("master not found: {}...".format(s))
 
-    in_pattern = '*'+ext
+    in_pattern = "*" + ext
     # for filename in re.compile(fnmatch.translate(in_pattern), re.IGNORECASE):
 
     sha_files_count = 1
     for filename in sorted(glob.glob(in_pattern)):
-        if filename == base_file or ("unique" in filename) or (filename.startswith('_')):
+        if filename == base_file or ("unique" in filename) or (filename.startswith("_")):
             continue
-        print('{}:'.format(sha_files_count))
+        print("{}:".format(sha_files_count))
         s = os.path.join(dir_name, filename)
         unique_log = []
-        read_file(s, d, d_ext, unique_log=unique_log, read_junks=read_junks, read_underscore_folders=read_underscore_folders, sha_blacklist=sha_blacklist)
+        read_file(
+            s,
+            d,
+            d_ext,
+            unique_log=unique_log,
+            read_junks=read_junks,
+            read_underscore_folders=read_underscore_folders,
+            sha_blacklist=sha_blacklist,
+        )
         if len(unique_log) > 0:
-            s = os.path.join(dir_name, '_' + os.path.splitext(filename)[0] + "-uniques" + ext)
+            s = os.path.join(dir_name, "_" + os.path.splitext(filename)[0] + "-uniques" + ext)
             hlp.save_sha_tup_list(unique_log, s)
         # write_file(d, os.path.join(dir, outfile))
         print("{} new unique files from file:{}, base file:{}".format(len(unique_log), filename, base_file))
@@ -129,14 +164,14 @@ def read_write(dir_name, master, ext='.' + sha_kind, save_uniques_list = True, r
     print("\n---- finished loading {} sha files ---- \n".format(sha_files_count))
 
     if save_uniques_list:
-        l = get_unique_tup_list_from_dict(d)
-        s = os.path.join(dir_name, '_uniques' + ext)
-        hlp.save_sha_tup_list(l, s)
+        lst = hlp.get_unique_tup_list_from_dict(d)
+        s = os.path.join(dir_name, "_uniques" + ext)
+        hlp.save_sha_tup_list(lst, s)
     return d
 
 
 def look_for_missing_and_mismatch(d, data_dir_name, log_path, verify_sha=False):
-    print('searching for missing files from dir: {}...'.format(data_dir_name))
+    print("searching for missing files from dir: {}...".format(data_dir_name))
     total = 0
     found = 0
     missing_list = []
@@ -160,17 +195,16 @@ def look_for_missing_and_mismatch(d, data_dir_name, log_path, verify_sha=False):
 
     time_str = time.strftime("%Y%m%d-%H%M%S")
     if sha_err:
-        hlp.save_list_to_file(sha_err, os.path.join(log_path, 'sha_err_'+time_str+'.txt'))
+        hlp.save_list_to_file(sha_err, os.path.join(log_path, "sha_err_" + time_str + ".txt"))
     if missing_list:
-        hlp.save_list_to_file(missing_list, os.path.join(log_path, 'missing_list_'+time_str+'.txt'))
-    print('total:{} found:{} sha_err:{} missing:{} '.
-          format(total, found, len(sha_err), len(missing_list)))
+        hlp.save_list_to_file(missing_list, os.path.join(log_path, "missing_list_" + time_str + ".txt"))
+    print("total:{} found:{} sha_err:{} missing:{} ".format(total, found, len(sha_err), len(missing_list)))
 
 
 def delete_from_list(sha_filename_to_delete_tup_list, data_dir, actually_delete, remove_log_filename=None):
     if remove_log_filename:
         files_remove_log = open(remove_log_filename, "a+")
-    print('delete from dir: {}'.format(data_dir))
+    print("delete from dir: {}".format(data_dir))
     missing_count = 0
     sha_err_filenames = []
     deleted_filenames = []
@@ -189,22 +223,33 @@ def delete_from_list(sha_filename_to_delete_tup_list, data_dir, actually_delete,
                         files_remove_log.write(remove_log_filename)
             else:
                 sha_err_filenames.append(filename)
-                print('err #{:5d}: {}'.format(len(sha_err_filenames), filename))
+                print("err #{:5d}: {}".format(len(sha_err_filenames), filename))
         else:
             missing_count += 1
     if remove_log_filename:
         files_remove_log.close()
-    print('deleted files from junk file list = [missing: {}; sha_err: {}; deleted: {}]'.
-          format(missing_count, len(sha_err_filenames), len(deleted_filenames)))
+    print(
+        "deleted files from junk file list = [missing: {}; sha_err: {}; deleted: {}]".format(
+            missing_count, len(sha_err_filenames), len(deleted_filenames)
+        )
+    )
 
 
 def delete_duplicates(
-        data_dir, d, junk_sha_filename_tup_list,
-        delete_junk_filename_templates=True, sha_to_delete_set=set(),
-        delete_dups=True,
-        verify_file_existance=True, verify_sha=True, verify_sha_allcopies=True, actually_delete=False,
-        do_prints=False, save_lists_prefix=None):
-    print('delete duplicates from dir: {}'.format(data_dir))
+    data_dir,
+    d,
+    junk_sha_filename_tup_list,
+    delete_junk_filename_templates=True,
+    sha_to_delete_set=set(),
+    delete_dups=True,
+    verify_file_existance=True,
+    verify_sha=True,
+    verify_sha_allcopies=True,
+    actually_delete=False,
+    do_prints=False,
+    save_lists_prefix=None,
+):
+    print("delete duplicates from dir: {}".format(data_dir))
     total = 0
 
     missing = []
@@ -216,13 +261,13 @@ def delete_duplicates(
     delete_by_sha = []
 
     all_lists = [
-        ('missing', missing),
-        ('sha_err', sha_err),
-        ('sha_ok', sha_ok),
-        ('firsts', firsts),
-        ('delete_by_dup', delete_by_dup),
-        ('delete_by_template', delete_by_template),
-        ('delete_by_sha', delete_by_sha),
+        ("missing", missing),
+        ("sha_err", sha_err),
+        ("sha_ok", sha_ok),
+        ("firsts", firsts),
+        ("delete_by_dup", delete_by_dup),
+        ("delete_by_template", delete_by_template),
+        ("delete_by_sha", delete_by_sha),
     ]
 
     if not data_dir:
@@ -267,12 +312,12 @@ def delete_duplicates(
                     else:
                         sha_err.append(kv)
                         if do_prints:
-                            print('err #{:5d}: {}'.format(len(sha_err), filename))
+                            print("err #{:5d}: {}".format(len(sha_err), filename))
                 else:
                     sha_verified = False
                     missing.append(filename)
                     if do_prints:
-                        print('mis #{:5d}: {}'.format(len(missing), filename))
+                        print("mis #{:5d}: {}".format(len(missing), filename))
 
                 if copy_found:
                     # found a concrete duplicate
@@ -280,16 +325,19 @@ def delete_duplicates(
                         delete_this_file = True
                         delete_by_dup.append(kv)
                         if do_prints:
-                            print('del #{:5d}: {}'.format(len(delete_by_dup), filename))
+                            print("del #{:5d}: {}".format(len(delete_by_dup), filename))
                 else:
                     copy_found = sha_verified
             if delete_this_file:
                 junk_sha_filename_tup_list.append(kv)
                 if actually_delete:
                     os.remove(filename)
-    print('total junk files: by template: {} by sha: {}'.format(len(delete_by_template), len(delete_by_sha)))
-    print('total: {} = [missing: {}; sha_err: {}; sha_ok: {} =(firsts: {}; delete_by_dup: {})]'.
-          format(total, len(missing), len(sha_err), len(sha_ok), len(firsts), len(delete_by_dup)))
+    print("total junk files: by template: {} by sha: {}".format(len(delete_by_template), len(delete_by_sha)))
+    print(
+        "total: {} = [missing: {}; sha_err: {}; sha_ok: {} =(firsts: {}; delete_by_dup: {})]".format(
+            total, len(missing), len(sha_err), len(sha_ok), len(firsts), len(delete_by_dup)
+        )
+    )
     if save_lists_prefix:
         for name, tup_list in all_lists:
             filename = os.path.join(save_lists_prefix, name)
@@ -325,10 +373,11 @@ def restore_duplicates(dir_name, d):
                     restored_failed.append(filename)
             is_first = False
 
-    print('total: {} = [found: {}; firsts: {}; restored: {}; restored_failed: {}]'.
-          format(total, len(found), len(firsts), len(restored), len(restored_failed)))
-
-
+    print(
+        "total: {} = [found: {}; firsts: {}; restored: {}; restored_failed: {}]".format(
+            total, len(found), len(firsts), len(restored), len(restored_failed)
+        )
+    )
 
 
 # def read_out_file(d, filename):

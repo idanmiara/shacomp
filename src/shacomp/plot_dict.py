@@ -1,6 +1,6 @@
-from shacomp import plot
 import matplotlib.pyplot as plt
-import shacomp.helper as hlp
+from src import shacomp as hlp
+from src.shacomp import plot
 
 
 def dict_stats(d, do_plot=False):
@@ -10,17 +10,17 @@ def dict_stats(d, do_plot=False):
     print("dict stats: unique entries:{}/{}".format(len(d), total))
 
     if do_plot:
-        print('plotting histograms')
+        print("plotting histograms")
         # plt.subplot(211)
         # plt.ylabel('copies per hash')
         # shacomp_plot.my_plot(copies_per_hash)
 
         plt.subplot(211)
-        plt.ylabel('copies hist')
+        plt.ylabel("copies hist")
         plot.my_plot(copies_hist)
 
         plt.subplot(212)
-        plt.ylabel('ext hist')
+        plt.ylabel("ext hist")
         plot.my_plot(ext_hist)
 
         plt.show()
