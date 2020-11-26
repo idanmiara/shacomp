@@ -4,6 +4,7 @@ import hashlib
 import os
 import sys
 import time
+import re
 
 from src.shacomp.timer import Timer
 
@@ -146,7 +147,7 @@ def sort_sha(filename):
     save_sha_tup_list(tuple_list, filename2)
 
 
-def make_signatures(path, base_path, output_root, use_cache=True):
+def make_signaturs(path, base_path, output_root, use_cache=True, white_pattern=None, black_pattern=None):
     timestr = time.strftime("%Y%m%d-%H%M%S")
     output_filename = os.path.join(output_root, timestr + ".sha512")
 
@@ -156,6 +157,9 @@ def make_signatures(path, base_path, output_root, use_cache=True):
     print(path)
     reverse_dict = {}
 
+    white_regex = None if white_pattern is None else re.compile(white_pattern)
+    black_regex = None if black_pattern is None else re.compile(black_pattern)
+
     if use_cache:
         for filename in sorted(glob.glob(os.path.join(output_root, r"**\*.sha512"), recursive=True)):
             if os.path.isfile(filename):
@@ -163,6 +167,7 @@ def make_signatures(path, base_path, output_root, use_cache=True):
                 for k, v in tuple_list:
                     reverse_dict[v] = k
 
+    os.makedirs(os.path.dirname(output_filename), exist_ok=True)
     sha_output_file = open(output_filename, "w", encoding="utf-8-sig")
     failed_file = None
     not_files_file = None
@@ -172,7 +177,10 @@ def make_signatures(path, base_path, output_root, use_cache=True):
     with Timer():
         print("start reading files to sha...")
         for filename in sorted(glob.glob(path, recursive=True)):
-            if os.path.isdir(filename):
+            if os.path.isdir(filename) or \
+                    (white_regex and not re.match(white_regex, filename)) or \
+                    (black_regex and re.match(black_regex, filename)):
+                print(f'skipping {filename}')
                 continue
             rel_filename = os.path.relpath(filename, base_path)
             if not os.path.isfile(filename):
@@ -211,3 +219,48 @@ def make_signatures(path, base_path, output_root, use_cache=True):
         failed_file.close()
     if not_files_file is not None:
         not_files_file.close()
+    return output_filename
+
+
+def verify_signatures(sha_filename, data_dir_name, log_path, write_ok_files_log, verify_sha=True):
+    print("searching for missing files from dir: {}...".format(data_dir_name))
+    total = 0
+    found = 0
+    missing_list = []
+    sha_err = []
+    sha_ok = []
+    tuple_list = load_sha_tuples(sha_filename)
+    sig_len = 128
+    invalid = []
+    for kv in tuple_list:
+        if (len(kv) != 2) or (len(kv[0]) != sig_len) or (len(kv[1]) == 0):
+            invalid.append(kv)
+        else:
+            key = kv[0].lower()
+            f = kv[1]
+            total += 1
+            f = normpath1(f)
+            filename = os.path.join(data_dir_name, f)
+            curr_found = os.path.isfile(filename)
+            if curr_found:
+                found += 1
+                if verify_sha:
+                    sha_hex = sha512_file(filename)
+                    sha_verified = key == sha_hex
+                    if sha_verified:
+                        sha_ok.append(filename)
+                    else:
+                        sha_err.append(filename)
+
+            else:
+                missing_list.append(filename)
+                print(filename)
+
+    time_str = time.strftime("%Y%m%d-%H%M%S")
+    if write_ok_files_log and sha_ok:
+        save_list_to_file(sha_ok, os.path.join(log_path, "sha_ok_" + time_str + ".txt"))
+    if sha_err:
+        save_list_to_file(sha_err, os.path.join(log_path, "sha_err_" + time_str + ".txt"))
+    if missing_list:
+        save_list_to_file(missing_list, os.path.join(log_path, "missing_list_" + time_str + ".txt"))
+    print("total:{} found:{} sha_err:{} missing:{} ".format(total, found, len(sha_err), len(missing_list)))
