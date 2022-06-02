@@ -14,7 +14,7 @@ sha_kind = "sha512"
 
 def is_junk_file(filename):
     filename = os.path.basename(filename).lower()
-    return filename in lists.junk
+    return filename in lists.junk_filenames
 
 
 # returns the keys of all files that exist

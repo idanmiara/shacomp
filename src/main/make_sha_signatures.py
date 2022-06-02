@@ -1,6 +1,6 @@
 import os
 
-from src.shacomp import helper as hlp
+from src.shacomp import helper
 
 if __name__ == "__main__":
     pattern = r"**\*"
@@ -11,4 +11,4 @@ if __name__ == "__main__":
     # path = r'd:\dev\shacomp'
     input_path = os.path.join(path, pattern)
     output_root = r"d:\dev\shacomp\new"
-    hlp.make_signatures(input_path, base_path, output_root)
+    helper.make_signatures(input_path, base_path, output_root)

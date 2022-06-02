@@ -5,6 +5,7 @@ import os
 import sys
 import time
 import re
+from pathlib import Path
 
 from src.shacomp.timer import Timer
 
@@ -21,10 +22,14 @@ def sha512_file(file_name):
 
 
 # takes a windows or linux path (forward or backwards slashes) and returns a platform path
-def normpath1(f):
+def normpath1(f: str) -> str:
     f = os.path.join(*f.split("\\"))  # transform windows path to linux path
     return os.path.normpath(f)  # transform linux path to platform path
 
+
+# def normpath1(f: Path | str) -> Path:
+#     f = os.path.join(*str(f).split("\\"))  # transform windows path to linux path
+#     return Path(os.path.normpath(f))  # transform linux path to platform path
 
 def sum_default_dict(d):
     copies_per_hash = collections.Counter()  # for each key the value length
