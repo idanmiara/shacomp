@@ -5,9 +5,8 @@ import os
 import sys
 import time
 import re
-from pathlib import Path
 
-from src.shacomp.timer import Timer
+from shacomp.old.timer import Timer
 
 # from natsort import natsorted
 # import natsort as ns

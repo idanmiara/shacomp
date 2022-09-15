@@ -7,14 +7,15 @@ import shutil
 import time
 
 from src import shacomp as hlp
-from src.shacomp import lists, plot_dict
+from shacomp.old import plot_dict
+from shacomp import lists
 
 sha_kind = "sha512"
 
 
 def is_junk_file(filename):
     filename = os.path.basename(filename).lower()
-    return filename in lists.junk_filenames
+    return filename in lists.all_junk_filenames
 
 
 # returns the keys of all files that exist

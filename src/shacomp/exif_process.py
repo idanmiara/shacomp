@@ -37,7 +37,7 @@ class Exif:
     # Image Size                      : 2944x2208
     # GPS Latitude                    : 32 deg 34' 13.22" N
     # GPS Longitude                   : 34 deg 56' 29.58" E
-    type: str
+    ext: str
     t_org: str
     t_dig: str
     t_img: str
@@ -107,7 +107,7 @@ class Exif:
                 exif_decode(_0th.get(piexif.ImageIFD.Make)),
                 exif_decode(_0th.get(piexif.ImageIFD.Model)))
             e = cls(
-                type='jpg',
+                ext='.jpg',
 
                 t_org=t_org,
                 t_dig=t_dig,

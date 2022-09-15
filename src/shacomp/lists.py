@@ -59,5 +59,6 @@ sha_blacklist = {zero_sha}
 # 'fb1c1762bb9e2e1b70daa666f65ef88f81e480f18ffcfedf4c4ea0d9cd2edc57889edf981ce1a46e340cda57283298fc8d0169001921481b0f1f1f72f5991dd6'} #VENDOR.DOC/TXT
 
 
-junk_filenames = ["thumbs.db", "desktop.ini", "picasa.ini", ".picasa.ini", "picasa.ini1", ".picasa.ini1", ".nomedia", ".dropbox", "SYNOINDEX_MEDIA_INFO", "SYNO_DTIME"]
+all_junk_filenames = ["thumbs.db", "desktop.ini", "picasa.ini", ".picasa.ini", "picasa.ini1", ".picasa.ini1", ".nomedia", ".dropbox"]
 junk_ext = [".tec", ".cpi", ".lnk", ".one", ".lst", ".accdb"]
+synology_hidden_dirs = ['@eaDir']

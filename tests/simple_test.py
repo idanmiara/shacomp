@@ -1,6 +1,6 @@
 import fnmatch
 
-from shacomp import helper
+from shacomp.old import helper
 
 base_path = r'd:\dev\shacomp'
 path = base_path + r'\**\*.*'

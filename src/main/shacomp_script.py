@@ -6,9 +6,9 @@
 import os
 import sys
 from pathlib import Path
-from typing import Sequence
 
-from src.shacomp import lists, plot_dict, shacomp_rw, helper
+from shacomp.old import shacomp_rw, helper, plot_dict
+from shacomp import lists
 
 
 def main(sha_path: Path, data_path: Path):

@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 from src import shacomp as hlp
-from src.shacomp import plot
+from shacomp.old import plot
 
 
 def dict_stats(d, do_plot=False):

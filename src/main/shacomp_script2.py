@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from shacomp.exif_process import Exif, ExifStat, ExifRaw, fix_make_model, exif_parse_datetime
 from shacomp.general_util import get_logger
-from shacomp.lists import junk_filenames
+from shacomp.lists import all_junk_filenames, synology_hidden_dirs
 from shacomp.sha_config import sha_ext, sha_len, Checksum
 
 ShaDict = defaultdict[Checksum, list[PurePath]]
@@ -39,23 +39,34 @@ def get_sha_tuple(line: str) -> tuple[str, PurePath | None]:
 
 def is_non_junk_func(sha: str, path: PurePath) -> bool:
     spath = str(path)
-    junk_dirs = [
-        '@eaDir',
+    junk_roots = [
+        'backupz',
+        'zbak',
+        'zbackup',
+        'test',
+        'tmp',
+        'backup',
+    ]
+    if any(spath.startswith(f'{j}/') for j in junk_roots):
+        return False
+    junk_dirnames = [
+        *synology_hidden_dirs,
+        '#recycle',
         'venv',
-        'Vietnam-Suits',
-        'בנות עירבוב',
-        'התנתקות',
+        # 'Vietnam-Suits',
+        # 'בנות עירבוב',
+        # 'התנתקות',
         # 'd/#recycle',
         # 'd/Del',
     ]
-    junk_dirs = [f'/{x}/' for x in junk_dirs]
-    if any(j in spath for j in junk_dirs):
+    junk_dirnames = [f'/{x}/' for x in junk_dirnames]
+    if any(j in spath for j in junk_dirnames):
         return False
-    return path.name.lower() not in junk_filenames
+    return path.name.lower() not in all_junk_filenames
 
 
 def load_sha_only_set(filename: Path,
-                      keep_file_callback=is_non_junk_func,
+                      keep_file_callback=None,
                       encodings: Sequence[str] = ("utf-8-sig", "Windows-1255"),
                       count: int | None = None,
                       only_first: bool = False) -> ShaDict:
@@ -75,7 +86,7 @@ def load_sha_only_set(filename: Path,
                     sha, path = get_sha_tuple(line)
                     if path is None:
                         logger.warning(f'Invalid line: {line} in file {filename}')
-                    elif keep_file_callback(sha=sha, path=path):
+                    elif keep_file_callback is None or keep_file_callback(sha=sha, path=path):
                         if not only_first or sha not in sha_dict:
                             sha_dict[sha].append(path)
             return sha_dict
@@ -119,24 +130,58 @@ def save_sha_dict_to_file(sha_dict: ShaDict, filename: Path, only_first: bool = 
 #     sha_lines = [f"{v}\n" for v in sorted(sha_dict.values())]
 #     save_lines_to_file(lines=sha_lines, filename=filename)
 
+def add_ending(f: Path, ending: str) -> Path:
+    f = Path(f)
+    return Path(str(f.with_suffix('')) + ending + f.suffix)
 
-def create_unique_sha_files(filenames: list[Path], out_filename: Path | None,
+
+def create_clean_files(
+        filenames: list[Path],
+        count: int | None = None,
+        keep_file_callback=None,
+        overwrite: bool = False):
+
+    for filename in filenames:
+        unique_filename = add_ending(filename, '_unique')
+        clean_filename = add_ending(filename, '_clean')
+
+        if not overwrite and clean_filename.is_file() and unique_filename.is_file():
+            continue
+        sha_dict1 = load_sha_only_set(filename=filename, count=count,
+                                      keep_file_callback=keep_file_callback, only_first=False)
+        if overwrite or not clean_filename.is_file():
+            save_sha_dict_to_file(sha_dict=sha_dict1, filename=clean_filename, only_first=False)
+        if overwrite or not unique_filename.is_file():
+            save_sha_dict_to_file(sha_dict=sha_dict1, filename=unique_filename, only_first=True)
+
+
+def create_unique_sha_files(filenames: list[Path], out_filename: Path | None = None,
                             load_output_if_exists: bool = True,
                             count: int | None = None,
+                            keep_file_callback=None,
                             only_first: bool = False) -> ShaDict:
     logger.info(f'{filenames} -> {out_filename}')
-    if load_output_if_exists and out_filename.is_file():
-        sha_dict = load_sha_only_set(filename=out_filename, count=count, only_first=only_first)
+    if load_output_if_exists and out_filename is not None and out_filename.is_file():
+        sha_dict = load_sha_only_set(filename=out_filename, count=count,
+                                     keep_file_callback=keep_file_callback, only_first=only_first)
     else:
         # sha_dict = ShaDict()
         sha_dict = defaultdict(list)
         for filename in tqdm(filenames, desc='loading files'):
-            sha_dict1 = load_sha_only_set(filename=filename, count=count, only_first=only_first)
-            # if only_first:
-            #     sha_dict = sha_dict | sha_dict1
-            # else:
-            #     for k, d in sha_dict1.items():
-            #         sha_dict[k].extend(d)
+            unique_filename = add_ending(filename, '_unique')
+            clean_filename = add_ending(filename, '_clean')
+
+            file_to_load = \
+                unique_filename if unique_filename.is_file() and only_first else \
+                clean_filename if clean_filename.is_file() else \
+                filename
+            sha_dict1 = load_sha_only_set(filename=file_to_load, count=count,
+                                          keep_file_callback=keep_file_callback, only_first=only_first)
+            if not clean_filename.is_file() and not only_first:
+                save_sha_dict_to_file(sha_dict=sha_dict1, filename=clean_filename, only_first=False)
+            if not unique_filename.is_file():
+                save_sha_dict_to_file(sha_dict=sha_dict1, filename=unique_filename, only_first=True)
+
             for k, d in sha_dict1.items():
                 if not only_first or k not in sha_dict:
                     sha_dict[k].extend(d)
@@ -147,11 +192,19 @@ def create_unique_sha_files(filenames: list[Path], out_filename: Path | None,
 
 
 def find_missing(masters: list[Path], copies: list[Path], out_root: Path):
-    copy_dict = create_unique_sha_files(copies, out_filename=out_root / f'copies{sha_ext}', only_first=True)
-    master_dict = create_unique_sha_files(masters, out_filename=out_root / f'master{sha_ext}', only_first=True)
+    master_dict = create_unique_sha_files(masters, keep_file_callback=is_non_junk_func,
+                                          # out_filename=out_root / f'master{sha_ext}',
+                                          only_first=True)
+    copy_dict = create_unique_sha_files(copies, keep_file_callback=is_non_junk_func,
+                                        # out_filename=out_root / f'copies{sha_ext}',
+                                        only_first=True)
     diff_dict = {k: v for k, v in copy_dict.items() if k not in master_dict.keys()}
     logger.info(len(diff_dict))
-    save_sha_dict_to_file(sha_dict=diff_dict, filename=out_root / f'missing_from_master{sha_ext}')
+    if len(copies) == 1 and len(masters) == 1:
+        out_filename = f'{copies[0].stem}-missing_from-{masters[0].name}'
+    else:
+        out_filename = f'missing_from_master{sha_ext}'
+    save_sha_dict_to_file(sha_dict=diff_dict, filename=out_root / out_filename)
 
 
 def is_sha_file(sha: str, path: PurePath) -> bool:
@@ -176,6 +229,7 @@ def fix_unc(p: Path) -> Path:
 
 def find_missing_compare():
     root = Path(r'c:\dev\sha')
+    root_dk = root / 'dk'
 
     # new_root = Path('//diskitty18/.')
     # master = root / f'new\dk18_20220527{sha_ext}'
@@ -183,10 +237,24 @@ def find_missing_compare():
     # copies = list([fix_unc(new_root / filename) for filename in shas.values()])
 
     # copies = list((root / 'old').glob(rf'**\*{sha_ext}'))
-    copies = [Path(fr'c:\dev\sha\dk18_20220527\dk10_20220531{sha_ext}')]
-    print(copies)
-    masters = list((root / 'new').glob(rf'**\*{sha_ext}'))
-    find_missing(masters=masters, copies=copies, out_root=root)
+    # masters = list((root / 'new').glob(rf'**\*{sha_ext}'))
+    master_name = 'dk18_20220913'
+    # master_name = 'test0'
+    masters = [root_dk / f'{master_name}{sha_ext}']
+    print(f'{masters=}')
+
+    copy_names = ['dk18a_20220527']
+    # copy_names = ['dk18b_20220527']
+    # copy_names = ['dk10_20220531', 'dk08_20220601']
+    # copy_names = ['dk09_20220527-idan']
+    # copy_names = ['test1', 'test2']
+    print(f'{copy_names=}')
+
+    copies = [root_dk / f'{copy_name}{sha_ext}' for copy_name in copy_names]
+    create_clean_files(filenames=masters + copies)
+
+    # for copy in copies:
+    #     find_missing(masters=masters, copies=[copy], out_root=root_dk)
 
 
 def save_json(e: ExifDict, filename: Path):
@@ -248,13 +316,14 @@ def fix_exif_make_model(exif_dict: ExifDict):
         exif.make, exif.model = fix_make_model(exif.make, exif.model)
 
 
-def create_unique_lists(data_root: Path, input_root: Path, output_root: Path, name: str):
+def full_process(src_root: Path, input_root: Path, output_root: Path, name: str):
     filename = Path(input_root / f'{name}{sha_ext}')
 
     pickle_filename = output_root / f'{name}-unique.pickle'
     json_filename = output_root / f'{name}-unique.json'
 
-    sha_dict = create_unique_sha_files([filename], out_filename=output_root / f'{name}-unique{sha_ext}', count=None)
+    sha_dict = create_unique_sha_files([filename], keep_file_callback=is_non_junk_func,
+                                       out_filename=output_root / f'{name}-unique{sha_ext}', count=None)
 
     if json_filename.is_file():
         exif_dict = load_json(filename=json_filename)
@@ -268,7 +337,7 @@ def create_unique_lists(data_root: Path, input_root: Path, output_root: Path, na
         if pickle_filename.is_file():
             exif_raw_dict = unpickle_it(filename=pickle_filename)
         else:
-            exif_raw_dict, exif_stat = generate_exif_raw(sha_dict=sha_dict, data_root=data_root)
+            exif_raw_dict, exif_stat = generate_exif_raw(sha_dict=sha_dict, data_root=src_root)
             pickle_it(exif_raw_dict, filename=pickle_filename)
             for stat, sha_dict1 in exif_stat.items():
                 save_sha_dict_to_file(sha_dict=sha_dict1, filename=output_root / f'{name}-{stat.name}{sha_ext}')
@@ -356,10 +425,8 @@ def generate_new_names(sha_dict: ShaDict, exif_dict: ExifDict) -> ShaDict:
         except Exception:
             logger.warning(f'Invalid timeframe {exif.t_org} for {sha} {base_name}')
             continue
-        # logger.info(f'{sha} {base_name}')
-        # src = fix_unc(src_root / base_name)
         parts = [p for p in [t, exif.make, exif.model, sha] if p]
-        dst_name = dst_dir / '_'.join(parts).replace(' ', '_')
+        dst_name = dst_dir / ('_'.join(parts).replace(' ', '_') + exif.ext)
         # dst = fix_unc(dst_root / dst_name)
         new_names[sha] = [dst_name]
     return new_names
@@ -375,7 +442,7 @@ def do_rename(filename: Path, src_data: Path, dst_root: Path):
                 fp.write(f'{src_filename}\n')
                 print(src_filename)
                 continue
-            dst_filename = fix_unc(dst_root / (dst+'.jpg'))
+            dst_filename = fix_unc(dst_root / dst)
             dir_name = dst_filename.parent
             if not dir_name.is_dir():
                 dir_name.mkdir(parents=True)
@@ -395,29 +462,66 @@ def do_remove(filename: Path, src_data: Path):
             os.remove(src_filename)
 
 
+def del_all_junk_filenames(sha_dict: ShaDict, src_root: Path,
+                           junk_filenames: list[str], junk_dirnames: list[str]):
+    # del_sha_dict = defaultdict(list)
+    junk_dirnames = [f'/{x}/' for x in junk_dirnames]
+    for sha, base_names in sha_dict.items():
+        # names = list(set([Path(x).name.lower() for x in base_names]))
+        # if names[0] in junk_filenames:
+        #     if len(names) != 1:
+        #         logger.warning(f'{base_names} has some junk names and some not')
+        #         continue
+        # if not all([Path(x).name] for x in base_names):
+        #     continue
+        for base_name in base_names:
+            name = base_name.name.lower()
+            spath = str(base_name)
+            if name in junk_filenames or any(j in spath for j in junk_dirnames):
+                src = fix_unc(src_root / base_name)
+                # del_sha_dict[sha].append(base_name)
+                if src.is_file():
+                    logger.info(f'del {src}')
+                    os.remove(src)
+
+
 def main():
     src_root = Path('//diskitty18/.')
     dst_root = Path('//diskitty18/d/pic/.')
     output_root = Path(r'c:\dev\sha')
     name = 'dk18a_20220527-pic'
-    input_root = Path('c:\dev\sha\dk18_20220527')
+    input_root = Path('c:\dev\sha\dk_20220527')
 
     # name = 'temp'
     # input_root = Path('c:\dev\sha')
 
-    # sha_dict1 = load_sha_only_set(filename=Path(rf'c:\dev\sha\missing_from_master{sha_ext}'))
+    if (del_junk := True):
+        junk_dirnames = [
+            *synology_hidden_dirs,
+            'venv',
+            'Vietnam-Suits',
+            'בנות עירבוב',
+        ]
+        master_sha_filenames = [input_root / f'{name}{sha_ext}']
+        sha_dict = create_unique_sha_files(filenames=master_sha_filenames)
+        del_all_junk_filenames(sha_dict=sha_dict, src_root=src_root,
+                               junk_filenames=all_junk_filenames, junk_dirnames=junk_dirnames)
+        exit()
+
+
+    # sha_dict1 = load_sha_only_set(filename=Path(master_sha)
 
     # create_unique_lists(src_root=src_root, input_root=input_root, name=name, output_root=output_root)
 
-    rename_filename = input_root / f'{name}-rename.csv'
-    do_rename(filename=rename_filename, src_data=src_root, dst_root=dst_root)
+    # rename_filename = output_root / f'{name}-rename.csv'
+    # do_rename(filename=rename_filename, src_data=src_root, dst_root=dst_root)
 
-    remove_filename = input_root / f'{name}-remove.txt'
+    remove_filename = output_root / f'{name}-remove.txt'
     do_remove(filename=remove_filename, src_data=src_root)
 
-    # keep_filename = input_root / f'{name}-keep.txt'
-
+    # keep_filename = output_root / f'{name}-keep.txt'
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    find_missing_compare()
