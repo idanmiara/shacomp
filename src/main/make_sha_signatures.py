@@ -1,6 +1,6 @@
 import os
 
-from src.shacomp import helper as hlp
+from shacomp import helper as hlp
 
 if __name__ == "__main__":
     pattern = r"**\*"

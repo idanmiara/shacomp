@@ -6,8 +6,8 @@ import os
 import shutil
 import time
 
-from src import shacomp as hlp
-from src.shacomp import lists, plot_dict
+from shacomp import helper as hlp
+from shacomp import lists
 
 sha_kind = "sha512"
 
@@ -91,7 +91,7 @@ def read_file(
     )
     print("ext list:")
     print(d_ext)
-    plot_dict.dict_stats(d)
+    # plot_dict.dict_stats(d)
 
 
 def read_write(

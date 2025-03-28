@@ -6,8 +6,8 @@
 import os
 import sys
 
-from src import shacomp as hlp
-from src.shacomp import lists, plot_dict, shacomp_rw
+from shacomp import helper as hlp
+from shacomp import lists, plot_dict, shacomp_rw
 
 pathname = os.path.dirname(sys.argv[0])
 sha_dir = r"../../temp"
